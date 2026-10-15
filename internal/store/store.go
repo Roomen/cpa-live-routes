@@ -626,6 +626,12 @@ func (s *Store) Complete(c *wire.Completion) {
 		}
 	}
 	if r == nil {
+		// A completion with no model, no credential and no earlier record is not a
+		// model execution: CPA also completes GET /v1/models, which management
+		// GUIs poll every 30 s as a health check.
+		if c.Model == "" && c.RequestedModel == "" && c.AuthIndex() == "" {
+			return
+		}
 		t0 := now
 		if !c.StartedAt.IsZero() {
 			t0 = min(c.StartedAt.UnixMilli(), now)

@@ -102,6 +102,14 @@ h1{font-size:18px;margin:0;font-weight:650;letter-spacing:.01em}
 .r2 span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
 .r2 .md{flex:none;max-width:60%;color:var(--text-primary)}
 .r3{justify-content:space-between;font-size:11px;color:var(--text-faint);margin-top:1px}
+.cfgp{margin:12px 0 0;padding:12px 16px}
+.cfgp h2{margin:0 0 6px;font-size:13px;font-weight:600}
+.cfgp p{margin:4px 0 10px;color:var(--text-quaternary);font-size:12px;line-height:1.6}
+.cfgp code{font-size:12px}
+.cfgg{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:4px 18px;font-size:12px}
+.cfgg div{display:flex;justify-content:space-between;gap:10px;padding:3px 0;border-bottom:1px dashed var(--border-color);min-width:0}
+.cfgg span:first-child{color:var(--text-quaternary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cfgp pre{margin:10px 0 0;padding:8px 10px;background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:8px;font-size:12px;overflow-x:auto}
 .gate{max-width:560px;margin:48px auto;padding:22px 24px;text-align:center}
 .gate h2{margin:0 0 8px;font-size:16px}
 .gate p{margin:6px 0;color:var(--text-quaternary);line-height:1.6}
@@ -137,8 +145,15 @@ h1{font-size:18px;margin:0;font-weight:650;letter-spacing:.01em}
       <div class="seg" id="segLayout" role="group" aria-label="布局">
         <button data-l="tabs" aria-pressed="true">标签页</button><button data-l="split" aria-pressed="false">分栏</button>
       </div>
+      <button class="btn" id="bCfg" aria-pressed="false" aria-controls="cfgp">配置</button>
     </div>
   </div>
+  <section class="panel cfgp" id="cfgp" hidden>
+    <h2>当前生效的插件配置</h2>
+    <p>这里只读。修改请编辑 CPA 的 <code class="mono">config.yaml</code> 中 <code class="mono">plugins.configs.live-routes</code> 下的键，保存后 CPA 会重新下发配置，本页自动刷新，无需重启。</p>
+    <div class="cfgg" id="cfgg"></div>
+    <pre class="mono" id="cfgy"></pre>
+  </section>
   <div class="chips">
     <div class="chip"><small id="lReq">区间请求</small><b class="mono" id="cReq">0</b></div>
     <div class="chip"><small>进行中</small><b class="mono" id="cInf">0</b></div>
@@ -163,10 +178,10 @@ h1{font-size:18px;margin:0;font-weight:650;letter-spacing:.01em}
         </div>
         <span class="muted" id="rangeInfo"></span>
         <button class="btn" id="bNow" hidden>回到现在</button>
-        <div class="legend" id="legend" aria-label="接入端图例"></div>
+        <div class="legend" id="legend" aria-label="harness / 客户端图例"></div>
       </div>
-      <div class="box" id="boxF"><canvas id="cvF" aria-label="接入端、会话、CPA 规则、出口账号流向"></canvas></div>
-      <div class="box" id="boxT"><canvas id="cvT" aria-label="按出口账号分道的请求时间线"></canvas></div>
+      <div class="box" id="boxF"><canvas id="cvF" aria-label="入口（OAuth / API）、CPA 规则、harness / 客户端、会话流向"></canvas></div>
+      <div class="box" id="boxT"><canvas id="cvT" aria-label="按入口分道的请求时间线"></canvas></div>
     </div>
     <div class="panel feed"><h2>最近请求<span id="feedN"></span></h2><ul id="list"></ul></div>
   </div>
@@ -271,9 +286,9 @@ function repack() {
 const lowerBound = (L, t) => { let lo = 0, hi = L.length; while (lo < hi) { const m = (lo + hi) >> 1; if (L[m].t0 < t) lo = m + 1; else hi = m; } return lo; };
 
 /* name helpers */
-const cliName = id => { const c = D.clients.get(id); return c ? (c.label || c.kind) : (id ? '客户端#' + id : '未知接入端'); };
+const cliName = id => { const c = D.clients.get(id); return c ? (c.label || c.kind) : (id ? '客户端#' + id : '未知客户端'); };
 function cliSub(id) { const c = D.clients.get(id); if (!c) return ''; const k = c.key && D.keys.get(c.key); return [k ? (k.label || k.mask) : '', c.ip].filter(Boolean).join(' · '); }
-const exitName = id => { const x = D.exits.get(id); return x ? (x.label || 'idx ' + x.auth_index) : (id ? '出口#' + id : '未分配'); };
+const exitName = id => { const x = D.exits.get(id); return x ? (x.label || 'idx ' + x.auth_index) : (id ? '入口#' + id : '未分配'); };
 const exitSub = id => { const x = D.exits.get(id); return x ? [x.provider, '#' + x.auth_index].filter(Boolean).join(' · ') : ''; };
 const exitProv = id => { const x = D.exits.get(id); return x && x.provider ? x.provider : (id ? '其他' : '排队中'); };
 const ruleLabel = id => { const r = D.rules.get(id); return r ? (r.alias === r.model ? r.alias : r.alias + ' → ' + r.model) : (id ? '规则#' + id : '未识别'); };
@@ -309,7 +324,8 @@ const PN = new Map();
 let F = { nodes: new Map(), edges: new Map(), paths: new Map(), lists: { c: [], s: [], r: [], x: [] }, sig: '', totX: 0, nIn: 0 };
 let hub = { x: 0, y: 0, w: 0, h: 0, ry0: 0, rh: 28, hdr: 40, foot: 24 };
 let lastCompute = 0, computeVer = -1, nodeAnim = false, hover = null, rel = null, G = null, relSig = '';
-const pathKeys = r => { const k = ['c' + (r.client || 0)]; if (r.session && expanded.has(r.client || 0)) k.push('s' + r.session); k.push('r' + (r.rule || 0)); if (r.exit) k.push('x' + r.exit); return k; };
+/* a request starts at its session (when its client is expanded), then client, rule and exit */
+const pathKeys = r => { const c = r.client || 0, k = r.session && expanded.has(c) ? ['s' + r.session, 'c' + c] : ['c' + c]; k.push('r' + (r.rule || 0)); if (r.exit) k.push('x' + r.exit); return k; };
 
 function computeFlow(t) {
   const winMs = cfg.active_window_s * 1000, rg = rangeMs, L = getList();
@@ -321,7 +337,7 @@ function computeFlow(t) {
     const keys = pathKeys(r);
     for (const key of keys) {
       let n = found.get(key);
-      if (!n) found.set(key, n = { key, type: key[0], id: +key.slice(1), last: 0, n: 0, ok: 0, fail: 0, tok: 0, lat: 0, inf: 0, t429: 0, sess: new Set() });
+      if (!n) found.set(key, n = { key, type: key[0], id: +key.slice(1), cli: r.client || 0, last: 0, n: 0, ok: 0, fail: 0, tok: 0, lat: 0, inf: 0, t429: 0, sess: new Set() });
       if (last > n.last) n.last = last;
       if (inr) { n.n++; if (r.state === 'done') { n.ok++; n.lat += r.lat || ((r.t1 || t) - r.t0); } else if (bad) n.fail++; if (r.tok) n.tok += r.tok.total || 0; }
       if (live) n.inf++;
@@ -354,9 +370,11 @@ function computeFlow(t) {
   for (const n of nodes.values()) { ls[n.type].push(n); if (n.type === 'x') { n.share = totX ? n.n / totX : 0; n.fr = n.n ? n.fail / n.n : 0; } }
   ls.c.sort((a, b) => a.id - b.id); ls.r.sort((a, b) => a.id - b.id);
   const cIdx = new Map(ls.c.map((n, i) => [n.id, i]));
-  ls.s.sort((a, b) => { const sa = D.sessions.get(a.id) || {}, sb = D.sessions.get(b.id) || {}; return ((cIdx.get(sa.client) || 0) - (cIdx.get(sb.client) || 0)) || (!!sa.parent - !!sb.parent) || a.id - b.id; });
+  /* sessions are grouped by the client their requests came from, so each group can sit in its client's band */
+  const cOf = n => cIdx.has(n.cli) ? cIdx.get(n.cli) : ls.c.length;
+  ls.s.sort((a, b) => { const sa = D.sessions.get(a.id) || {}, sb = D.sessions.get(b.id) || {}; return (cOf(a) - cOf(b)) || (!!sa.parent - !!sb.parent) || a.id - b.id; });
   ls.x.sort((a, b) => exitProv(a.id).localeCompare(exitProv(b.id)) || exitName(a.id).localeCompare(exitName(b.id)) || a.id - b.id);
-  const sig = [ls.c, ls.s, ls.r, ls.x].map(a => a.map(n => n.key).join(',')).join('|') + '#' + W + effLayout() + (dpr | 0) + D.rules.size;
+  const sig = [ls.c, ls.s, ls.r, ls.x].map(a => a.map(n => n.type === 's' ? n.key + '@' + n.cli : n.key).join(',')).join('|') + '#' + W + effLayout() + (dpr | 0) + D.rules.size;
   F = { nodes, edges, paths, lists: ls, sig: F.sig, totX, nIn: 0 };
   if (sig !== F.sig) { F.sig = sig; layoutFlow(); }
   else for (const n of nodes.values()) if (n.fresh) { n.y = n.ty; }
@@ -376,23 +394,41 @@ function layoutFlow() {
   const nR = Math.max(1, ls.r.length), hasS = ls.s.length > 0, cols = hasS ? 4 : 3;
   const avail = W - 2 * G.pad - hub.w - G.gx * (cols - 1);
   let cw = clamp(avail * (hasS ? .3 : mini() ? .5 : .42), small ? 90 : 110, 190), sw = hasS ? clamp(avail * .2, small ? 62 : 90, 130) : 0, xw = clamp(avail * (hasS ? .3 : mini() ? .5 : .52), small ? 90 : 130, 230);
-  const total = cw + sw + xw + hub.w + G.gx * (cols - 1), gapX = total >= W - 2 * G.pad ? Math.max(6, G.gx * (W - 2 * G.pad - cw - sw - xw - hub.w) / Math.max(1, G.gx * (cols - 1))) : (W - 2 * G.pad - cw - sw - xw - hub.w) / (cols - 1);
-  const step0 = G.nh + G.gap, cnt = Math.max(1, ls.c.length, ls.s.length, ls.x.length);
+  /* when the minimum widths do not fit, shrink every column alike; otherwise the rightmost (clients) collapses to nothing */
+  const room = W - 2 * G.pad - hub.w - 6 * (cols - 1), sum = cw + sw + xw;
+  if (sum > room) { const f = Math.max(0, room) / sum; cw *= f; sw *= f; xw *= f; }
+  const gapX = Math.max(6, (W - 2 * G.pad - cw - sw - xw - hub.w) / (cols - 1));
+  /* one band per client: the client centred in it, its expanded sessions stacked to its right, so a client's
+     session links stay inside its own band and never pass behind another client's sessions */
+  const cPos = new Map(ls.c.map((n, i) => [n.id, i])), bands = ls.c.map(n => ({ c: n, ss: [] })), orphan = { c: null, ss: [] };
+  for (const n of ls.s) (cPos.has(n.cli) ? bands[cPos.get(n.cli)] : orphan).ss.push(n);
+  if (orphan.ss.length) bands.push(orphan);
+  const slots = bands.reduce((s, b) => s + Math.max(1, b.ss.length), 0);
+  const step0 = G.nh + G.gap, cnt = Math.max(1, slots, ls.x.length);
   let rh = G.rh; const hubNat = G.hdr + nR * rh + G.foot;
   FH = clamp(Math.ceil(G.top + G.bot + Math.max(hubNat, cnt * step0) + 4), G.min, G.max);
   const availH = FH - G.top - G.bot;
   if (hubNat > availH) rh = Math.max(12, (availH - G.hdr - G.foot) / nR);
   hub.rh = rh; hub.hdr = G.hdr; hub.foot = G.foot; hub.h = G.hdr + nR * rh + G.foot; hub.y = G.top + (mini() ? 0 : Math.max(0, (availH - hub.h) / 2)); hub.ry0 = hub.y + G.hdr;
-  let x = G.pad; const cx = x; x += cw + gapX; const sx = x; x += sw + (hasS ? gapX : 0); hub.x = x; x += hub.w + gapX; const xx = x;
-  const col = (arr, left, w) => {
-    const c = Math.max(1, arr.length), step = Math.min(step0, availH / c), h = Math.min(G.nh, step - G.gap * .6), y0 = G.top + (mini() ? 0 : (availH - step * c) / 2) + step / 2;
-    arr.forEach((n, i) => { n.ty = y0 + i * step; n.x = left; n.w = w; n.h = h; n.gm = Math.max(0, Math.min(16, (step - h) / 2 - 1, left - 1, W - left - w - 1)); if (n.fresh) n.y = n.ty; });
-  };
-  col(ls.c, cx, cw); col(ls.s, sx, sw); col(ls.x, xx, Math.min(xw, W - G.pad - xx));
+  /* exits on the left, then CPA, clients, and the sessions of expanded clients on the far right */
+  let x = G.pad; const xx = x; x += xw + gapX; hub.x = x; x += hub.w + gapX; const cx = x; x += cw + (hasS ? gapX : 0); const sx = x;
+  const grid = c => { const step = Math.min(step0, availH / c); return { step, h: Math.min(G.nh, step - G.gap * .6), y0: G.top + (mini() ? 0 : (availH - step * c) / 2) + step / 2 }; };
+  const put = (n, ty, left, w, g) => { n.ty = ty; n.x = left; n.w = w; n.h = g.h; n.gm = Math.max(0, Math.min(16, (g.step - g.h) / 2 - 1, left - 1, W - left - w - 1)); if (n.fresh) n.y = n.ty; };
+  const gx = grid(Math.max(1, ls.x.length));
+  ls.x.forEach((n, i) => put(n, gx.y0 + i * gx.step, xx, xw, gx));
+  const gb = grid(Math.max(1, slots)), cwR = hasS ? cw : Math.min(cw, W - G.pad - cx), swR = Math.min(sw, W - G.pad - sx);
+  let k = 0;
+  for (const b of bands) {
+    const m = Math.max(1, b.ss.length);
+    if (b.c) put(b.c, gb.y0 + (k + (m - 1) / 2) * gb.step, cx, cwR, gb);
+    b.ss.forEach((n, i) => put(n, gb.y0 + (k + i) * gb.step, sx, swR, gb));
+    k += m;
+  }
   ls.r.forEach((n, i) => { n.ry = hub.ry0 + i * rh + (rh - 3) / 2; n.y = n.ry; n.ty = n.ry; });
 }
-const portOut = n => n.type === 'r' ? { x: hub.x + hub.w, y: n.ry } : { x: n.x + n.w, y: n.y };
-const portIn = n => n.type === 'r' ? { x: hub.x, y: n.ry } : { x: n.x, y: n.y };
+/* requests travel right to left: they leave a node on its left edge and enter the next on its right edge */
+const portOut = n => n.type === 'r' ? { x: hub.x, y: n.ry } : { x: n.x, y: n.y };
+const portIn = n => n.type === 'r' ? { x: hub.x + hub.w, y: n.ry } : { x: n.x + n.w, y: n.y };
 const bzg = (a, b) => { const d = (b.x - a.x) * .5; return [a, { x: a.x + d, y: a.y }, { x: b.x - d, y: b.y }, b]; };
 const bezAt = (g, u) => { const m = 1 - u; return { x: m * m * m * g[0].x + 3 * m * m * u * g[1].x + 3 * m * u * u * g[2].x + u * u * u * g[3].x, y: m * m * m * g[0].y + 3 * m * m * u * g[1].y + 3 * m * u * u * g[2].y + u * u * u * g[3].y }; };
 const edgeG = e => bzg(portOut(F.nodes.get(e.a)), portIn(F.nodes.get(e.b)));
@@ -514,14 +550,14 @@ function drawHub() {
 }
 function drawChrome() {
   const split = effLayout() === 'split', small = W < 560, y = split ? 13 : small ? 20 : 26, f = `600 ${small || split ? 10.5 : 12}px ${SANS}`, ls = F.lists;
-  txt('接入端 · ' + ls.c.length, G.pad + 2, y, f, C.muted);
-  if (ls.s.length) txt('会话 · ' + ls.s.length, ls.s[0].x + 2, y, f, C.muted);
+  txt('入口 · OAuth / API · ' + ls.x.length, G.pad + 2, y, f, C.muted);
   txt('CPA 规则', hub.x + hub.w / 2, y, f, C.muted, 0, 'center');
-  txt('出口账号 · ' + ls.x.length, W - G.pad - 2, y, f, C.muted, 0, 'right');
+  if (ls.s.length) { txt('harness / 客户端 · ' + ls.c.length, ls.c[0].x + 2, y, f, C.muted); txt('会话 · ' + ls.s.length, W - G.pad - 2, y, f, C.muted, 0, 'right'); }
+  else txt('harness / 客户端 · ' + ls.c.length, W - G.pad - 2, y, f, C.muted, 0, 'right');
   if (split) return;
   const ly = FH - 16, lf = `${small ? 9.5 : 11}px ${SANS}`; let lx = small ? 8 : 16;
   for (const [c, t] of [[C.ok, '成功'], [C.err, '失败'], [C.info, '进行中']]) { X.fillStyle = c; X.beginPath(); X.arc(lx + 3, ly, 3, 0, 7); X.fill(); txt(t, lx + 10, ly, lf, C.faint); X.font = lf; lx += 10 + X.measureText(t).width + 12; }
-  if (!small) txt('线宽 = 近 60 秒请求速率（指数衰减）· 环 = 区间流量占比 / 失败 · 点击接入端展开会话', W - 16, ly, lf, C.faint, 0, 'right');
+  if (!small) txt('线宽 = 近 60 秒请求速率（指数衰减）· 环 = 区间流量占比 / 失败 · 点击客户端展开会话', W - 16, ly, lf, C.faint, 0, 'right');
 }
 function drawFlights() {
   if (!animOn()) return;
@@ -605,7 +641,7 @@ function nodeTip(h) {
   if (h.k === 'hub') return '<b>CPA</b>' + trow('规则数', F.lists.r.length);
   const n = h.n, rate = n.ok + n.fail >= 1 ? (n.ok / (n.ok + n.fail) * 100).toFixed(1) + '%' : '—';
   let s = `<b>${esc(nodeTitle(n))}</b>`;
-  if (n.type === 'c') { const c = D.clients.get(n.id); s += trow('接入端', c ? c.kind : '—') + trow('密钥 / IP', cliSub(n.id) || '—') + trow('会话数', n.sess.size) + (n.sess.size ? trow('', expanded.has(n.id) ? '点击收起会话' : '点击展开会话') : ''); }
+  if (n.type === 'c') { const c = D.clients.get(n.id); s += trow('harness', c ? c.kind : '—') + trow('密钥 / IP', cliSub(n.id) || '—') + trow('会话数', n.sess.size) + (n.sess.size ? trow('', expanded.has(n.id) ? '点击收起会话' : '点击展开会话') : ''); }
   if (n.type === 's') { const ss = D.sessions.get(n.id) || {}, par = ss.parent && D.sessions.get(ss.parent); s += trow('会话 ID', ss.sid || '—') + trow('父会话', par ? par.sid : '无'); }
   if (n.type === 'x') s += trow('凭证', exitSub(n.id) || '—') + (n.t429 ? trow('近期 429', fmtClock(n.t429, true), 'bad') : '');
   if (n.type === 'r') s += trow('规则', ruleLabel(n.id));
@@ -631,7 +667,7 @@ cvF.addEventListener('click', e => {
   const r = cvF.getBoundingClientRect(), h = hitFlow(e.clientX - r.left, e.clientY - r.top);
   if (h) { hover = h; computeRel(); tip.innerHTML = nodeTip(h); tip.classList.add('on'); placeTip(e.clientX, e.clientY); } else { hover = null; rel = null; tip.classList.remove('on'); }
   kick();
-  if (h && h.n && h.n.type === 'c' && h.n.sess.size) { if (expanded.has(h.n.id)) expanded.delete(h.n.id); else expanded.add(h.n.id); computeVer = -1; F.sig = ''; kick(); }
+  if (h && h.n && h.n.type === 'c' && (h.n.sess.size || expanded.has(h.n.id))) { if (expanded.has(h.n.id)) expanded.delete(h.n.id); else expanded.add(h.n.id); computeVer = -1; F.sig = ''; kick(); }
 });
 
 /* ---------- timeline ---------- */
@@ -757,7 +793,7 @@ function syncLegend(vis) {
 function recTip(r) {
   const cls = r.state === 'done' ? 'good' : r.state === 'failed' ? 'bad' : '', ss = D.sessions.get(r.session), par = ss && ss.parent && D.sessions.get(ss.parent), tk = r.tok;
   let s = `<b><i style="background:${cliColor(r.client)}"></i>${esc(cliName(r.client))}</b>`;
-  s += trow('密钥 / IP', cliSub(r.client) || '—') + trow('会话', ss ? ss.short + (par ? ' ← ' + par.short : '') : '—') + trow('规则', ruleLabel(r.rule)) + trow('出口', exitName(r.exit) + (exitSub(r.exit) ? ' · ' + exitSub(r.exit) : ''));
+  s += trow('密钥 / IP', cliSub(r.client) || '—') + trow('会话', ss ? ss.short + (par ? ' ← ' + par.short : '') : '—') + trow('规则', ruleLabel(r.rule)) + trow('入口', exitName(r.exit) + (exitSub(r.exit) ? ' · ' + exitSub(r.exit) : ''));
   s += trow('状态', stLabel(r) + (r.stream ? ' · stream' : ''), cls) + trow('开始', fmtClock(r.t0, true));
   if (r.ttft) s += trow('首字延迟', fmtSec(r.ttft));
   s += trow('总耗时', fmtSec(r.lat || ((r.t1 || now()) - r.t0)));
@@ -921,7 +957,18 @@ async function call(path, params) {
   let body = {}; try { body = await res.json(); } catch (_) { }
   const err = new Error('http ' + res.status); err.status = res.status; err.code = body.code; throw err;
 }
-function applyConfig(c) { if (c) { cfg = Object.assign({}, DEF_CFG, c); } }
+function applyConfig(c) { if (c) { cfg = Object.assign({}, DEF_CFG, c); } renderCfg(); }
+function renderCfg() {
+  const rows = [
+    ['retention_minutes', '保留时长', Math.round(cfg.retention_s / 60), ' 分钟'], ['max_records', '最大记录数', cfg.max_records, ' 条'],
+    ['active_window_minutes', '流向活跃窗口', Math.round(cfg.active_window_s / 60), ' 分钟'], ['animation_speed', '默认动画速度', cfg.animation_speed, ''],
+    ['reduced_animation', '减少动画', cfg.reduced_animation, ''], ['inflight_tracking', '追踪进行中请求', cfg.inflight_tracking, ''],
+    ['layout', '默认布局', cfg.layout, ''], ['require_key', '需要管理密钥', cfg.require_key, '']];
+  $('#cfgg').innerHTML = rows.map(([k, l, v, u]) => `<div title="${esc(k)}"><span>${esc(l)} · <span class="mono">${esc(k)}</span></span><span class="mono">${esc(String(v) + u)}</span></div>`).join('');
+  const yv = v => typeof v === 'string' ? '"' + v + '"' : String(v);
+  $('#cfgy').textContent = 'plugins:\n  configs:\n    live-routes:\n      enabled: true\n' + rows.map(([k, , v]) => '      ' + k + ': ' + yv(v)).join('\n');
+}
+$('#bCfg').onclick = e => { const p = $('#cfgp'), on = p.hidden; p.hidden = !on; e.currentTarget.setAttribute('aria-pressed', on); if (on) renderCfg(); };
 async function loadSnapshot() {
   const s = await call('snapshot'); skew = s.now - Date.now(); cursor = s.cursor; applyConfig(s.config);
   GROUPS.forEach(g => D[g].clear()); mergeDict(s.dict); resetData(); histGen++;
@@ -1034,7 +1081,7 @@ function startDemo() {
 
 /* ---------- boot ---------- */
 Object.defineProperty(window, '__lr', { value: Object.freeze({ get records() { return recs.size; }, get inflight() { return inflight.size; }, get rafCount() { return rafCount; }, get flights() { return flights.size; }, get layout() { return effLayout(); }, get nodes() { return F.nodes.size; }, get sessions() { return F.lists.s.length; }, get panned() { return viewEnd != null; },
-  get geom() { const nb = n => ({ k: n.key, x: n.x, y: n.y - n.h / 2, w: n.w, h: n.h, gm: n.gm == null ? 16 : n.gm }); return { W, FH, nodes: [...F.lists.c, ...F.lists.s, ...F.lists.x].map(nb) }; },
+  get geom() { const nb = n => ({ k: n.key, x: n.x, y: n.y - n.h / 2, w: n.w, h: n.h, gm: n.gm == null ? 16 : n.gm }); return { W, FH, nodes: [...F.lists.c, ...F.lists.s, ...F.lists.x].map(nb), edges: [...F.edges.values()].filter(e => e.w / .3 >= .02).map(e => ({ a: e.a, b: e.b, segs: [edgeG(e)] })) }; },
   get firstClient() { const n = F.lists.c[0]; if (!n) return null; const r = cvF.getBoundingClientRect(); return { x: r.left + n.x + n.w / 2, y: r.top + n.y }; } }) });
 (function boot() {
   readColors(); W = Math.max(280, $('#mainp').clientWidth || 800); dpr = Math.min(2, window.devicePixelRatio || 1);

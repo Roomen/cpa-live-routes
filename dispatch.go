@@ -159,7 +159,7 @@ func registration(tracking bool) registrationResult {
 		SchemaVersion: schemaVersion,
 		Metadata: metadata{
 			Name:             "Live Routes",
-			Version:          "0.1.0",
+			Version:          "0.1.2",
 			Author:           "Roomen",
 			GitHubRepository: "https://github.com/Roomen/cpa-live-routes",
 			ConfigFields:     config.Fields(),
