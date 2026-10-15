@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const OUT = path.join(here, 'out');
 fs.mkdirSync(OUT, { recursive: true });
-for (const f of fs.readdirSync(OUT)) if (f.endsWith('.png')) fs.unlinkSync(path.join(OUT, f));
+for (const f of fs.readdirSync(OUT)) if (f.endsWith('.png') && (!process.argv.includes('--auth-only') || f.startsWith('auth-'))) fs.unlinkSync(path.join(OUT, f));
 const pwPath = process.env.PLAYWRIGHT_MODULE || path.join(execSync('npm root -g').toString().trim(), 'playwright');
 const { chromium } = createRequire(import.meta.url)(pwPath);
 
@@ -38,15 +38,28 @@ async function newPage(browser, origin, opts, label, log) {
   await ctx.addInitScript(INIT);
   if (Object.keys(initLS).length) await ctx.addInitScript(l => { try { if (!sessionStorage.getItem('__init')) { for (const k in l) localStorage.setItem(k, l[k]); sessionStorage.setItem('__init', '1'); } } catch (e) {} }, initLS);
   const page = await ctx.newPage();
-  const errs = [], badReq = [], reqs = [];
+  const errs = [], badReq = [], reqs = [], dataReqs = [];
   page.on('console', m => { if (m.type() === 'error') errs.push('console: ' + m.text()); });
   page.on('pageerror', e => errs.push('pageerror: ' + e.message));
+  page.on('request', req => {
+    const u = new URL(req.url());
+    reqs.push(u.pathname + u.search);
+    if (u.pathname.startsWith('/v0/management/live-routes/')) dataReqs.push({ path: u.pathname, method: req.method(), auth: req.headers().authorization });
+  });
   await page.route('**/*', route => {
     const u = new URL(route.request().url());
     if (u.origin !== origin) { badReq.push(route.request().url()); return route.abort(); }
-    reqs.push(u.pathname + u.search); return route.continue();
+    return route.continue();
   });
-  return { ctx, page, errs, badReq, reqs, label };
+  return { ctx, page, errs, badReq, reqs, dataReqs, label };
+}
+
+async function openLive(h, url) {
+  await h.page.goto(url);
+  if (new URL(url).searchParams.get('demo') !== '1') {
+    await h.page.waitForSelector('#gKeyBox:not([hidden])');
+    await h.page.fill('#gKey', 'test-key'); await h.page.click('#gGo');
+  }
 }
 
 async function storageAudit(h, label) {
@@ -55,11 +68,13 @@ async function storageAudit(h, label) {
     let dbs = 0; try { dbs = indexedDB.databases ? (await indexedDB.databases()).length : 0; } catch (e) {}
     return { keys, session: Object.keys(sessionStorage).filter(k => k !== '__init').length, cookie: document.cookie, idb: window.__idb, dbs, href: location.href };
   });
-  check(r.keys.every(k => ALLOWED.has(k)), `${label}: localStorage keys ⊆ allowed (${r.keys.join(',') || 'none'})`);
+  check(r.keys.every(k => ALLOWED.has(k)), `${label}: localStorage keys ⊆ allowed (${r.keys.join(',') || 'key'})`);
   check(r.session === 0 && r.cookie === '' && r.idb === 0 && r.dbs === 0, `${label}: no sessionStorage/cookie/IndexedDB`);
   return r;
 }
 function endChecks(h, label) {
+  check(h.reqs.every(r => !r.startsWith('/v0/resource/plugins/live-routes/api/') && !r.startsWith('/v0/management/live-routes/session')), `${label}: no legacy data/session endpoint`);
+  check(h.dataReqs.every(r => r.method === 'GET' && /^Bearer .+/.test(r.auth || '')), `${label}: every data call carries a Bearer management key`);
   check(h.errs.length === 0, `${label}: no console/page errors${h.errs.length ? ' -> ' + h.errs.slice(0, 3).join(' | ') : ''}`);
   check(h.badReq.length === 0, `${label}: only mock-origin requests${h.badReq.length ? ' -> ' + h.badReq.join(',') : ''}`);
 }
@@ -70,7 +85,7 @@ async function scenario(browser, origin, src, layout, theme, phone, view) {
   const viewport = phone ? { width: 390, height: 844 } : { width: 1280, height: 800 };
   const h = await newPage(browser, origin, { viewport, scheme: theme, ls, dsf: phone ? 2 : 1, touch: phone }, label);
   const url = origin + '/v0/resource/plugins/live-routes/live' + (src === 'demo' ? '?demo=1' : '');
-  await h.page.goto(url);
+  await openLive(h, url);
   let sawInflight = false;
   const t0 = Date.now();
   while (Date.now() - t0 < 5600) {
@@ -80,7 +95,7 @@ async function scenario(browser, origin, src, layout, theme, phone, view) {
   const s = await h.page.evaluate(() => ({ r: window.__lr.records, i: window.__lr.inflight, n: window.__lr.nodes, lay: window.__lr.layout }));
   check(s.r > 0, `${label}: records loaded (${s.r}), nodes ${s.n}, layout ${s.lay}`);
   if (src === 'mock') check(sawInflight || s.i >= 1, `${label}: queued/routed record rendered (inflight ${s.i})`);
-  if (src === 'demo') check(!h.reqs.some(r => r.includes('/api/')), `${label}: demo makes no api calls`);
+  if (src === 'demo') check(!h.reqs.some(r => r.startsWith('/v0/management/live-routes/')), `${label}: demo makes no api calls`);
   if (layout === 'split' && !phone) check(s.lay === 'split', `${label}: split layout active`);
   if (phone) {
     const sw = await h.page.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth, bw: document.body.scrollWidth }));
@@ -120,6 +135,38 @@ async function authKey(browser) {
   const noTokenInUrl = h.reqs.every(r => !r.includes('tok-') && !r.includes('test-key'));
   check(noTokenInUrl, 'auth=key: token/key not sent in any URL');
   await h.page.screenshot({ path: path.join(OUT, 'auth-key-after.png') });
+  await h.page.click('#segRange button[data-r="600000"]');
+  await h.page.click('#segView button[data-v="time"]');
+  await sleep(300);
+  let heldHistory;
+  await h.page.route('**/v0/management/live-routes/records?*', route => { heldHistory = route; });
+  const historyBox = await h.page.locator('#cvT').boundingBox();
+  await h.page.mouse.move(historyBox.x + historyBox.width / 2, historyBox.y + historyBox.height / 2);
+  for (let i = 0; i < 12; i++) { await h.page.mouse.wheel(0, -400); await sleep(60); }
+  await sleep(1200);
+  check(!!heldHistory, 'auth=key: history request held while polling continues');
+  check(['snapshot', 'events', 'records'].every(name => h.dataReqs.some(r => r.path.endsWith('/' + name) && r.auth === 'Bearer test-key')), 'auth=key: snapshot/events/history all use management Bearer key');
+  check(h.dataReqs.filter(r => r.auth !== 'Bearer wrong-key').every(r => r.auth === 'Bearer test-key'), 'auth=key: successful requests keep using the supplied management key');
+  let revoked = false;
+  await h.page.route('**/v0/management/live-routes/events?*', route => {
+    revoked = true; return route.fulfill({ status: 401, contentType: 'application/json', body: '{"error":"invalid management key"}' });
+  });
+  await h.page.waitForSelector('#gKeyBox:not([hidden])', { timeout: 10000 });
+  check(revoked && await h.page.inputValue('#gKey') === '', 'auth=key: a later 401 clears key and asks for reauthentication');
+  const pausedAt = h.dataReqs.length; await sleep(1400);
+  check(h.dataReqs.length === pausedAt, 'auth=key: polling stops until key is reentered');
+  await h.page.unroute('**/v0/management/live-routes/events?*');
+  const newSnapshot = h.page.waitForResponse(r => r.url().endsWith('/snapshot') && r.status() === 200);
+  await h.page.fill('#gKey', 'test-key'); await h.page.click('#gGo');
+  await newSnapshot;
+  if (heldHistory) await heldHistory.fulfill({ status: 401, contentType: 'application/json', body: '{"error":"expired old key"}' });
+  await sleep(400);
+  check(await h.page.isHidden('#gate'), 'auth=key: delayed 401 from old history request cannot clear the new login');
+  const beforeReload = h.dataReqs.length;
+  await h.page.reload();
+  await h.page.waitForSelector('#gKeyBox:not([hidden])');
+  check(await h.page.inputValue('#gKey') === '' && h.dataReqs.length === beforeReload, 'auth=key: reload starts without saved credentials or data requests');
+
   h.errs = h.errs.filter(e => !e.includes('status of 401')); // the browser logs the expected 401 responses of the auth flow
   endChecks(h, 'auth=key');
   await h.ctx.close();
@@ -127,12 +174,22 @@ async function authKey(browser) {
 async function authForbidden(browser) {
   const origin = await startMock(18419, 'forbidden');
   const h = await newPage(browser, origin, { viewport: { width: 1000, height: 600 } }, 'auth=forbidden');
-  await h.page.goto(origin + '/v0/resource/plugins/live-routes/live');
+  await openLive(h, origin + '/v0/resource/plugins/live-routes/live');
   await h.page.waitForSelector('#gForb:not([hidden])', { timeout: 5000 });
   const t = await h.page.textContent('#gForb');
-  check(t.includes('请从本机（127.0.0.1 / localhost）打开，或在插件配置中开启 require_key 后用管理密钥访问'), 'auth=forbidden: notice shown with required text');
+  check(t.includes('CPA 管理接口拒绝访问') && t.includes('远程管理访问设置'), 'auth=forbidden: notice explains management access settings');
+  check(t.includes('请先在 CPA 配置管理密钥') && t.includes('remote-management.secret-key') && t.includes('MANAGEMENT_PASSWORD') && t.includes('本机访问也需要配置'), 'auth=forbidden: notice explains management key prerequisite');
+  check(t.includes('失败次数过多被暂时封禁') && t.includes('5 次') && t.includes('30 分钟'), 'auth=forbidden: notice explains temporary authentication ban');
   await h.page.screenshot({ path: path.join(OUT, 'auth-forbidden.png') });
+  const requestsBeforeRetry = h.dataReqs.length;
+  await h.page.click('#gRetry');
+  await h.page.waitForSelector('#gKeyBox:not([hidden])');
+  check(await h.page.isHidden('#gForb') && await h.page.inputValue('#gKey') === '', 'auth=forbidden: retry opens an empty key form');
   await sleep(1200);
+  check(h.dataReqs.length === requestsBeforeRetry, 'auth=forbidden: retry waits for explicit key submission');
+  await h.page.fill('#gKey', 'test-key'); await h.page.click('#gGo');
+  await h.page.waitForSelector('#gForb:not([hidden])');
+  check(h.dataReqs.length > requestsBeforeRetry, 'auth=forbidden: key submission retries management access');
   // 403 errors from fetch are expected as network responses but must not surface as page errors
   check(h.errs.filter(e => !e.includes('403')).length === 0, 'auth=forbidden: no page errors');
   check(h.badReq.length === 0, 'auth=forbidden: only mock-origin requests');
@@ -179,7 +236,7 @@ async function busyChecks(browser, origin) {
   for (const [name, viewport, scheme, ls, dsf, phone] of cases) {
     const label = 'busy-one-exit/' + name;
     const h = await newPage(browser, origin, { viewport, scheme, ls, dsf, touch: phone }, label);
-    await h.page.goto(origin + '/v0/resource/plugins/live-routes/live');
+    await openLive(h, origin + '/v0/resource/plugins/live-routes/live');
     await h.page.waitForFunction(() => window.__lr.records > 20 && window.__lr.nodes > 3, null, { timeout: 10000 });
     await sleep(6000);
     const g = await h.page.evaluate(() => window.__lr.geom);
@@ -205,7 +262,7 @@ async function idleChecks(browser, origin, quietOrigin) {
   await h.ctx.close();
   // (b) live, normal motion: after the mock goes quiet and all requests finish, rAF stops
   h = await newPage(browser, quietOrigin, { viewport: { width: 1280, height: 800 } }, 'idle/live-quiet');
-  await h.page.goto(quietOrigin + '/v0/resource/plugins/live-routes/live');
+  await openLive(h, quietOrigin + '/v0/resource/plugins/live-routes/live');
   await h.page.waitForFunction(() => window.__lr.records > 0, null, { timeout: 8000 });
   await sleep(3000);
   const busy0 = await h.page.evaluate(() => window.__rafN); await sleep(1000); const busy1 = await h.page.evaluate(() => window.__rafN);
@@ -221,7 +278,7 @@ async function idleChecks(browser, origin, quietOrigin) {
 
 async function interactions(browser, origin) {
   const h = await newPage(browser, origin, { viewport: { width: 1280, height: 800 } }, 'interact');
-  await h.page.goto(origin + '/v0/resource/plugins/live-routes/live');
+  await openLive(h, origin + '/v0/resource/plugins/live-routes/live');
   await h.page.waitForFunction(() => window.__lr.records > 0 && window.__lr.nodes > 0, null, { timeout: 8000 });
   await sleep(800);
   const before = await h.page.evaluate(() => window.__lr.sessions);
@@ -243,7 +300,7 @@ async function interactions(browser, origin) {
   await sleep(1200);
   check(await h.page.evaluate(() => window.__lr.panned), 'interact: wheel pans back, panned state active');
   check(await h.page.isVisible('#bNow'), 'interact: "回到现在" button visible after panning');
-  check(h.reqs.some(r => r.includes('/api/records?before=') && r.includes('limit=2000')), 'interact: older records fetched (api/records?before=<cursor>&limit=2000)');
+  check(h.reqs.some(r => r.includes('/v0/management/live-routes/records?before=') && r.includes('limit=2000')), 'interact: older records fetched (management/live-routes/records?before=<cursor>&limit=2000)');
   await h.page.screenshot({ path: path.join(OUT, 'live-tabs-light-panned.png') });
   await h.page.click('#bNow'); await sleep(300);
   check(!(await h.page.evaluate(() => window.__lr.panned)), 'interact: back to now');
@@ -258,7 +315,7 @@ async function interactions(browser, origin) {
 async function evictAndReset(browser, origin) {
   const ctl = async p => (await fetch(origin + p)).json();
   const h = await newPage(browser, origin, { viewport: { width: 1280, height: 800 } }, 'reset');
-  await h.page.goto(origin + '/v0/resource/plugins/live-routes/live');
+  await openLive(h, origin + '/v0/resource/plugins/live-routes/live');
   await h.page.waitForFunction(() => window.__lr.records > 20 && window.__lr.nodes > 0 && document.querySelectorAll('#list li').length > 0, null, { timeout: 10000 });
   await ctl('/__quiet?on=1');
   await sleep(2500); // let the page take the last upserts
@@ -281,7 +338,8 @@ async function evictAndReset(browser, origin) {
 
 const browser = await chromium.launch();
 try {
-  const origin = await startMock(18417, 'none');
+  if (process.argv.includes('--auth-only')) { await authKey(browser); await authForbidden(browser); } else {
+  const origin = await startMock(18417, 'key');
   const files = [];
   const jobs = [];
   for (const src of ['mock', 'demo']) {
@@ -298,10 +356,11 @@ try {
   await expandedLinkChecks(browser, origin);
   await authKey(browser);
   await authForbidden(browser);
-  const quietOrigin = await startMock(18420, 'none');
+  const quietOrigin = await startMock(18420, 'key');
   await idleChecks(browser, origin, quietOrigin);
-  await busyChecks(browser, await startMock(18421, 'none', 'busy-one-exit'));
-  await evictAndReset(browser, await startMock(18422, 'none'));
+  await busyChecks(browser, await startMock(18421, 'key', 'busy-one-exit'));
+  await evictAndReset(browser, await startMock(18422, 'key'));
+  }
 } catch (e) {
   failures.push('exception: ' + (e && e.stack || e)); console.log('FAIL exception', e);
 } finally {

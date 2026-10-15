@@ -14,7 +14,7 @@ type Config struct {
 	ReducedAnimation    bool              `yaml:"reduced_animation"`
 	InflightTracking    bool              `yaml:"inflight_tracking"`
 	Layout              string            `yaml:"layout"`
-	RequireKey          bool              `yaml:"require_key"`
+	RequireKey          bool              `yaml:"require_key"` // Deprecated: management authentication is always required.
 	APIKeyLabels        map[string]string `yaml:"api_key_labels"`
 }
 
@@ -27,6 +27,7 @@ func Default() Config {
 		AnimationSpeed:      "1x",
 		InflightTracking:    true,
 		Layout:              "tabs",
+		RequireKey:          true,
 	}
 }
 
@@ -44,6 +45,7 @@ func Parse(raw []byte) (Config, error) {
 // Clamp forces out-of-range values back into range.
 func (c Config) Clamp() Config {
 	d := Default()
+	c.RequireKey = true
 	c.RetentionMinutes = clamp(c.RetentionMinutes, 1, 120)
 	c.MaxRecords = clamp(c.MaxRecords, 1000, 100000)
 	c.ActiveWindowMinutes = min(clamp(c.ActiveWindowMinutes, 1, 60), c.RetentionMinutes)
@@ -85,7 +87,6 @@ func Fields() []Field {
 		{Name: "reduced_animation", Type: "boolean", Default: d.ReducedAnimation, Description: "Disable flying dots; show link widths and counters only."},
 		{Name: "inflight_tracking", Type: "boolean", Default: d.InflightTracking, Description: "Observe requests before completion (queued and routed states). Off: usage replay only."},
 		{Name: "layout", Type: "enum", Default: d.Layout, EnumValues: []string{"tabs", "split"}, Description: "Default page layout."},
-		{Name: "require_key", Type: "boolean", Default: d.RequireKey, Description: "Require a management-key session token for the data routes. Without it the plugin trusts a loopback Origin/Referer, which non-browser clients can forge: keep it off only when CPA listens on 127.0.0.1."},
 		{Name: "api_key_labels", Type: "object", Default: map[string]string{}, Description: "Map of sha256 hex prefix (8+ chars) of a client API key to a display label."},
 	}
 }

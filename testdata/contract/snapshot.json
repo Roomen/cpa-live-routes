@@ -4,7 +4,7 @@
   "cursor": "9f3c1a2b:1842",
   "now": 1760500000000,
   "oldest": 1760498400000,
-  "config": {"active_window_s": 600, "retention_s": 1800, "max_records": 5000, "animation_speed": "1x", "reduced_animation": false, "inflight_tracking": true, "layout": "tabs", "require_key": false},
+  "config": {"active_window_s": 600, "retention_s": 1800, "max_records": 5000, "animation_speed": "1x", "reduced_animation": false, "inflight_tracking": true, "layout": "tabs", "require_key": true},
   "dict": {
     "clients": [
       {"id": 1, "kind": "claude-code", "label": "Claude Code 2.0.14", "ua": "claude-cli/2.0.14 (external, cli)", "key": 1},

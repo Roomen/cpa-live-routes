@@ -1,1 +1,1 @@
-{"code": "unauthorized", "message": "view token missing or invalid"}
+{"error":"missing management key"}

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Mock of the Live Routes plugin routes. No dependencies.
-// usage: node mock-server.mjs [--port=18417] [--auth=none|key|forbidden] [--scenario=busy-one-exit]
+// usage: node mock-server.mjs [--port=18417] [--auth=key|forbidden] [--scenario=busy-one-exit]
 // --scenario=busy-one-exit (opt-in): ~4 req/s, 2 clients, 3 rules, a single exit account.
 // Control endpoints: GET /__quiet?on=1|0 stops/starts synthesis, GET /__stats.
 // Opt-in: GET /__evict?n=K drops the K oldest records (one "evict" event naming their ids);
@@ -13,10 +13,10 @@ import { fileURLToPath } from 'node:url';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, '..', '..');
 const arg = (n, d) => { const a = process.argv.find(x => x.startsWith('--' + n + '=')); return a ? a.slice(n.length + 3) : d; };
-const PORT = +arg('port', 18417), AUTH = arg('auth', 'none'), SCENARIO = arg('scenario', '');
-const PAGE = '/v0/resource/plugins/live-routes/live', API = '/v0/resource/plugins/live-routes/api/';
+const PORT = +arg('port', 18417), AUTH = arg('auth', 'key'), SCENARIO = arg('scenario', '');
+const PAGE = '/v0/resource/plugins/live-routes/live', API = '/v0/management/live-routes/';
 const fixture = JSON.parse(fs.readFileSync(path.join(root, 'testdata/contract/snapshot.json'), 'utf8'));
-const KEY = 'test-key', SESSION_ID = 'tok-' + Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
+const KEY = 'test-key';
 
 let epoch = Math.random().toString(16).slice(2, 10);
 let seq = 0;
@@ -24,7 +24,8 @@ const dict = JSON.parse(JSON.stringify(fixture.dict));
 dict.clients.push({ id: 3, kind: 'opencode', label: 'OpenCode 0.15', ip: '192.168.1.31', key: 2 });
 dict.sessions.push({ id: 4, sid: 'claude:90ac11de-72b0-4c8e-a1f3-55d0c2e4b7a1', short: '90ac11de', client: 1 }, { id: 5, sid: 'opencode:ses_5b2a9', short: 'ses_5b2a', client: 3 });
 dict.rules.push({ id: 4, alias: 'sonnet', model: 'claude-sonnet-4-5' });
-const config = { ...fixture.config, layout: 'tabs', require_key: AUTH === 'key' };
+const config = { ...fixture.config, layout: 'tabs' };
+delete config.require_key;
 let ROUTE = { 1: [1, 2], 2: [2], 3: [3], 4: [1, 2, 3] };
 let CL = [{ c: 1, s: [1, 2, 4], r: [1, 2, 4] }, { c: 2, s: [3], r: [3] }, { c: 3, s: [5], r: [4, 2] }];
 if (SCENARIO === 'busy-one-exit') { ROUTE = { 1: [1], 2: [1], 3: [1] }; CL = [{ c: 1, s: [1, 2, 4], r: [1, 2] }, { c: 2, s: [3], r: [2, 3] }]; }
@@ -108,13 +109,9 @@ http.createServer((req, res) => {
       'Content-Security-Policy': "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; img-src data:" });
     return res.end(fs.readFileSync(path.join(root, 'web/index.html')));
   }
-  if (u.pathname === '/v0/management/live-routes/session' && req.method === 'POST') {
-    if (req.headers.authorization === 'Bearer ' + KEY) return json(res, 200, { token: SESSION_ID, expires_at: Date.now() + 43200000, ttl_s: 43200 });
-    return json(res, 401, { code: 'unauthorized', message: 'bad key' });
-  }
   if (u.pathname.startsWith(API)) {
-    if (AUTH === 'forbidden') return json(res, 403, { code: 'forbidden_host', message: 'open this page from 127.0.0.1 or localhost, or enable require_key' });
-    if (AUTH === 'key' && req.headers['x-live-routes-token'] !== SESSION_ID) return json(res, 401, { code: 'unauthorized', message: 'view token missing or invalid' });
+    if (AUTH === 'forbidden') return json(res, 403, { error: 'remote management disabled' });
+    if (req.headers.authorization !== 'Bearer ' + KEY) return json(res, 401, { error: 'invalid management key' });
     const what = u.pathname.slice(API.length), now = Date.now();
     if (what === 'snapshot') {
       const all = sorted(), cutoff = now - 8 * 60000;

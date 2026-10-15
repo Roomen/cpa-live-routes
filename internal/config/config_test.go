@@ -11,7 +11,7 @@ func TestDefaults(t *testing.T) {
 		t.Fatalf("%+v %v", cfg, err)
 	}
 	if cfg.RetentionMinutes != 30 || cfg.MaxRecords != 5000 || cfg.ActiveWindowMinutes != 10 || cfg.AnimationSpeed != "1x" ||
-		cfg.Layout != "tabs" || !cfg.InflightTracking || cfg.RequireKey || cfg.ReducedAnimation {
+		cfg.Layout != "tabs" || !cfg.InflightTracking || !cfg.RequireKey || cfg.ReducedAnimation {
 		t.Fatalf("defaults: %+v", cfg)
 	}
 }
@@ -46,7 +46,19 @@ func TestClamp(t *testing.T) {
 }
 
 func TestFields(t *testing.T) {
-	if got := len(Fields()); got != 9 {
+	if got := len(Fields()); got != 8 {
 		t.Fatalf("fields = %d", got)
+	}
+}
+
+func TestLegacyRequireKeyCannotDisableAuthentication(t *testing.T) {
+	cfg, err := Parse([]byte("require_key: false"))
+	if err != nil || !cfg.RequireKey {
+		t.Fatalf("legacy setting must preserve mandatory authentication")
+	}
+	for _, field := range Fields() {
+		if field.Name == "require_key" {
+			t.Fatal("deprecated setting exposed in configuration UI")
+		}
 	}
 }

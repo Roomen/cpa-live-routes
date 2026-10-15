@@ -53,7 +53,7 @@ func TestRegistration(t *testing.T) {
 		t.Fatal(err)
 	}
 	c := reg.Capabilities
-	if reg.SchemaVersion != 6 || reg.Metadata.Name != "Live Routes" || len(reg.Metadata.ConfigFields) != 9 ||
+	if reg.SchemaVersion != 6 || reg.Metadata.Name != "Live Routes" || len(reg.Metadata.ConfigFields) != 8 ||
 		!c["usage_plugin"] || !c["management_api"] || !c["request_interceptor"] || !c["request_lifecycle_plugin"] {
 		t.Fatalf("%+v", reg)
 	}
@@ -85,8 +85,13 @@ func TestMethods(t *testing.T) {
 		Routes    []struct{ Method, Path string }
 		Resources []struct{ Path, Menu string }
 	}
-	if err := json.Unmarshal(res, &mr); err != nil || !ok || len(mr.Routes) != 2 || len(mr.Resources) != 4 || mr.Resources[0].Path != "/live" || mr.Resources[0].Menu != "Live Routes" || mr.Resources[1].Menu != "" {
+	if err := json.Unmarshal(res, &mr); err != nil || !ok || len(mr.Routes) != 3 || len(mr.Resources) != 1 || mr.Resources[0].Path != "/live" || mr.Resources[0].Menu != "Live Routes" {
 		t.Fatalf("%s", res)
+	}
+	for i, path := range []string{"/live-routes/snapshot", "/live-routes/events", "/live-routes/records"} {
+		if mr.Routes[i].Method != "GET" || mr.Routes[i].Path != path {
+			t.Fatalf("unexpected management routes: %s", res)
+		}
 	}
 }
 
@@ -131,7 +136,7 @@ func TestEndToEndThroughDispatch(t *testing.T) {
 	}
 
 	res, ok, _ := call(t, p, "management.handle", map[string]any{
-		"Method": "GET", "Path": "/v0/resource/plugins/live-routes/api/snapshot",
+		"Method": "GET", "Path": "/v0/management/live-routes/snapshot",
 		"Headers": map[string][]string{"Host": {"127.0.0.1:8317"}}, "host_callback_id": "cb",
 	})
 	var mr struct {
@@ -164,7 +169,7 @@ func TestHostAuthListEnvelope(t *testing.T) {
 	})
 	register(t, p, "", 6)
 	p.handle("request.intercept_after", interceptPayload("r1", "t1", 64))
-	mgmt := map[string]any{"Method": "GET", "Path": "/x/api/snapshot", "Headers": map[string][]string{"Host": {"localhost"}}, "host_callback_id": "cb-1"}
+	mgmt := map[string]any{"Method": "GET", "Path": "/v0/management/live-routes/snapshot", "Headers": map[string][]string{"Host": {"localhost"}}, "host_callback_id": "cb-1"}
 	res, _, _ := call(t, p, "management.handle", mgmt)
 	var mr struct{ Body []byte }
 	json.Unmarshal(res, &mr)
