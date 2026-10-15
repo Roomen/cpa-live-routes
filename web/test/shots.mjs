@@ -140,6 +140,40 @@ async function authForbidden(browser) {
 }
 
 
+// samples every visible link and counts points that fall inside a node the link does not connect
+function linksUnderNodes(g) {
+  const at = (s, u) => { const m = 1 - u; return { x: m * m * m * s[0].x + 3 * m * m * u * s[1].x + 3 * m * u * u * s[2].x + u * u * u * s[3].x, y: m * m * m * s[0].y + 3 * m * m * u * s[1].y + 3 * m * u * u * s[2].y + u * u * u * s[3].y }; };
+  const hits = [];
+  for (const e of g.edges) for (const n of g.nodes) {
+    if (n.k === e.a || n.k === e.b) continue;
+    const inside = e.segs.some(s => { for (let i = 0; i <= 40; i++) { const p = at(s, i / 40); if (p.x > n.x + 2 && p.x < n.x + n.w - 2 && p.y > n.y + 2 && p.y < n.y + n.h - 2) return true; } return false; });
+    if (inside) hits.push(e.a + '>' + e.b + ' under ' + n.k);
+  }
+  return hits;
+}
+
+async function expandedLinkChecks(browser, origin) {
+  for (const [name, width] of [['desk', 1280], ['mid', 900]]) {
+    const label = 'expanded-links/' + name;
+    const h = await newPage(browser, origin, { viewport: { width, height: 800 } }, label);
+    await h.page.goto(origin + '/v0/resource/plugins/live-routes/live?demo=1');
+    await h.page.waitForFunction(() => window.__lr.nodes > 5, null, { timeout: 8000 });
+    await sleep(800);
+    // expand every client that has sessions, one at a time (positions move after each click)
+    for (let i = 0; i < 6; i++) {
+      const pts = await h.page.evaluate(() => { const r = document.querySelector('#cvF').getBoundingClientRect(); return window.__lr.geom.nodes.filter(n => n.k[0] === 'c').map(n => ({ x: r.left + n.x + n.w / 2, y: r.top + n.y + n.h / 2 })); });
+      if (i >= pts.length) break;
+      await h.page.mouse.click(pts[i].x, pts[i].y); await sleep(700);
+    }
+    await h.page.mouse.move(2, 2); await sleep(1500);
+    const g = await h.page.evaluate(() => window.__lr.geom), hits = linksUnderNodes(g);
+    check(g.nodes.some(n => n.k[0] === 's') && hits.length === 0, `${label}: no link runs under an unrelated node (${g.nodes.filter(n => n.k[0] === 's').length} sessions${hits.length ? '; ' + hits.slice(0, 4).join(', ') : ''})`);
+    await h.page.locator('#cvF').screenshot({ path: path.join(OUT, `expanded-${name}-flow.png`) });
+    endChecks(h, label);
+    await h.ctx.close();
+  }
+}
+
 async function busyChecks(browser, origin) {
   const cases = [['desk-light', { width: 1280, height: 800 }, 'light', {}, 1, false], ['desk-dark', { width: 1280, height: 800 }, 'dark', {}, 1, false], ['desk-split-light', { width: 1280, height: 800 }, 'light', { 'lr-layout': 'split' }, 1, false]];
   for (const [name, viewport, scheme, ls, dsf, phone] of cases) {
@@ -196,6 +230,9 @@ async function interactions(browser, origin) {
   await sleep(500);
   const after = await h.page.evaluate(() => window.__lr.sessions);
   check(before === 0 && after > 0, `interact: click client expands sessions (${before} -> ${after})`);
+  await sleep(1500);
+  const eh = linksUnderNodes(await h.page.evaluate(() => window.__lr.geom));
+  check(eh.length === 0, `interact: expanded links clear of unrelated nodes${eh.length ? ' (' + eh.slice(0, 4).join(', ') + ')' : ''}`);
   await h.page.screenshot({ path: path.join(OUT, 'live-tabs-light-expanded.png') });
   await h.page.click('#segRange button[data-r="600000"]');
   await h.page.click('#segView button[data-v="time"]');
@@ -258,6 +295,7 @@ try {
   }
   for (let i = 0; i < jobs.length; i += 4) files.push(...await Promise.all(jobs.slice(i, i + 4).map(j => j())));
   await interactions(browser, origin);
+  await expandedLinkChecks(browser, origin);
   await authKey(browser);
   await authForbidden(browser);
   const quietOrigin = await startMock(18420, 'none');

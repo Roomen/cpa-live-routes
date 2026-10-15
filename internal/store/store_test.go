@@ -206,6 +206,20 @@ func TestCompleteOnly(t *testing.T) {
 	}
 }
 
+func TestCompleteWithoutModelIgnored(t *testing.T) {
+	s, _ := newStore(t, nil)
+	s.Complete(&wire.Completion{RequestID: "models-list", TraceID: "tm", Outcome: "succeeded", StatusCode: 200})
+	if sn := snap(t, s); len(sn.Records) != 0 {
+		t.Fatalf("records: %+v", sn.Records)
+	}
+	// a known request still completes even when the completion carries no model
+	s.Before(intercept("req-m", "tm2"))
+	s.Complete(&wire.Completion{RequestID: "req-m", Outcome: "succeeded", StatusCode: 200})
+	if r := recByID(t, snap(t, s), "req-m"); r.State != api.StateDone {
+		t.Fatalf("known request: %+v", r)
+	}
+}
+
 func TestCompleteMergesUsageOnlyByTrace(t *testing.T) {
 	s, _ := newStore(t, nil)
 	s.Usage(usageOf("tz"))

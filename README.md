@@ -74,10 +74,10 @@ To update, replace the library file and restart CPA. To uninstall, set `plugins.
 
 ## Using the dashboard
 
-- **Flow view** shows what is happening now: client → CPA rule (alias → model) → exit credential. Link width follows the request rate of the last 60 seconds. Dots wait at CPA or at the exit while a request is in flight, and fly back when it completes. A node without traffic inside `active_window_minutes` fades out. Click a client to expand its sessions; hover over a session for its full ID and its parent session.
-- **Timeline view** is for looking back. It has one lane per exit credential, zoom levels of 30 s / 2 min / 10 min, and you can scroll or drag back to the oldest data still in memory. 429 responses are marked, and the tooltip shows `Retry-After`.
+- **Flow view** shows what is happening now, in columns entry (OAuth / API credential) → CPA rule (alias → model) → harness / client → session. Requests travel right to left, from the session or client through CPA to the entry credential. Link width follows the request rate of the last 60 seconds. Dots wait at CPA or at the entry while a request is in flight, and fly back when it completes. A node without traffic inside `active_window_minutes` fades out. Click a client to expand its sessions; they stack to its right inside the client's own row band, so the links of other clients do not cross them. Hover over a session for its full ID and its parent session. Completions with no model and no credential (such as the `GET /v1/models` health checks that management GUIs send every 30 seconds) are not recorded.
+- **Timeline view** is for looking back. It has one lane per entry credential, zoom levels of 30 s / 2 min / 10 min, and you can scroll or drag back to the oldest data still in memory. 429 responses are marked, and the tooltip shows `Retry-After`.
 - **Top stats** cover the selected range: requests, in-flight, success rate (done / (done + failed)), tokens/s (total tokens / range seconds) and average latency.
-- **Controls:** pause, a temporary animation speed (0.5x / 1x / 2x), and the layout (tabs, or split with the flow strip above the exit lanes). These preferences are stored only in this browser. The page follows the system light/dark theme and honors `prefers-reduced-motion`.
+- **Controls:** pause, a temporary animation speed (0.5x / 1x / 2x), and the layout (tabs, or split with the flow strip above the entry lanes). These preferences are stored only in this browser. The page follows the system light/dark theme and honors `prefers-reduced-motion`.
 
 ## Troubleshooting
 
@@ -92,7 +92,7 @@ To update, replace the library file and restart CPA. To uninstall, set `plugins.
 
 ## Configuration
 
-All options live under `plugins.configs.live-routes`. Besides the options below, `enabled` and `priority` are handled by CPA itself. Use `priority: -100` so the observer runs after other interceptors.
+All options live under `plugins.configs.live-routes`. The **配置** button on the page shows the values in effect and the matching YAML; the page is read-only, edit `config.yaml` and CPA pushes the change without a restart. Besides the options below, `enabled` and `priority` are handled by CPA itself. Use `priority: -100` so the observer runs after other interceptors.
 
 | Key | Default | Range / values | Description |
 | --- | --- | --- | --- |
@@ -102,7 +102,7 @@ All options live under `plugins.configs.live-routes`. Besides the options below,
 | `animation_speed` | `"1x"` | `0.5x`, `1x`, `2x` | Default animation speed of the page (viewers can change it). |
 | `reduced_animation` | `false` | boolean | No flying dots, only link widths and counters. |
 | `inflight_tracking` | `true` | boolean | Track queued and routed requests live. When `false` the plugin only replays usage records after completion. |
-| `layout` | `"tabs"` | `tabs`, `split` | Default page layout: switchable views, or flow strip above exit lanes. |
+| `layout` | `"tabs"` | `tabs`, `split` | Default page layout: switchable views, or flow strip above entry lanes. |
 | `require_key` | `false` | boolean | `false`: data routes answer requests whose `Origin`/`Referer` points at a loopback host; safe only when CPA listens on `127.0.0.1`. `true`: the page asks for the management key and uses a short-lived in-memory token. |
 | `api_key_labels` | `{}` | map | Friendly names for client API keys: sha256 hex prefix (at least 8 characters) of the key to a label. |
 

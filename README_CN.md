@@ -74,8 +74,8 @@ Expand-Archive $zip -DestinationPath plugins\windows\amd64 -Force   # live-route
 
 ## 使用说明
 
-- **流向视图**：显示当前正在发生的请求，路径为客户端 → CPA 规则（alias → model）→ 出口凭证。连线粗细跟随近 60 秒的请求速率。请求进行中时，光点停在 CPA 或出口处等待，完成后飞回。节点在 `active_window_minutes` 内没有流量就会淡出。点击客户端可展开它的会话；鼠标悬停在会话上，可查看完整 ID 和父会话。
-- **时间轴视图**：用来回看。每个出口凭证一条泳道，缩放档位为 30 秒、2 分钟、10 分钟，可用滚轮或拖动往回看，最早到内存中仍保留的数据。429 会单独标出，悬停可看到 `Retry-After`。
+- **流向视图**：显示当前正在发生的请求，各列依次为入口（OAuth / API 凭证）→ CPA 规则（alias → model）→ harness / 客户端 → 会话。请求从右向左流动，由会话或客户端经 CPA 到达入口凭证。连线粗细跟随近 60 秒的请求速率。请求进行中时，光点停在 CPA 或入口处等待，完成后飞回。节点在 `active_window_minutes` 内没有流量就会淡出。点击客户端可展开它的会话，会话排在该客户端右侧、它自己的行带内，其他客户端的连线不会穿过它们；鼠标悬停在会话上，可查看完整 ID 和父会话。没有模型也没有凭证的完成事件（例如管理 GUI 每 30 秒发出的 `GET /v1/models` 健康检查）不会被记录。
+- **时间轴视图**：用来回看。每个入口凭证一条泳道，缩放档位为 30 秒、2 分钟、10 分钟，可用滚轮或拖动往回看，最早到内存中仍保留的数据。429 会单独标出，悬停可看到 `Retry-After`。
 - **顶部统计**：按所选时间范围统计请求数、进行中、成功率（成功 / (成功 + 失败)）、tokens/s（总 token / 范围秒数）和平均延迟。
 - **控件**：暂停、临时动画速度（0.5x / 1x / 2x）、布局（标签页，或流向在上、泳道在下的分栏）。这些偏好只保存在当前浏览器。页面跟随系统的浅色/深色主题，并遵循 `prefers-reduced-motion`。
 
@@ -92,7 +92,7 @@ Expand-Archive $zip -DestinationPath plugins\windows\amd64 -Force   # live-route
 
 ## 配置
 
-所有选项位于 `plugins.configs.live-routes` 下。`enabled` 与 `priority` 由 CPA 自身处理。建议设置 `priority: -100`，让本观察器在其他拦截器之后运行。
+所有选项位于 `plugins.configs.live-routes` 下。页面上的 **配置** 按钮会显示当前生效的值和对应的 YAML；页面只读，修改请编辑 `config.yaml`，CPA 会直接下发，无需重启。`enabled` 与 `priority` 由 CPA 自身处理。建议设置 `priority: -100`，让本观察器在其他拦截器之后运行。
 
 | 配置项 | 默认值 | 取值范围 | 说明 |
 | --- | --- | --- | --- |
@@ -102,7 +102,7 @@ Expand-Archive $zip -DestinationPath plugins\windows\amd64 -Force   # live-route
 | `animation_speed` | `"1x"` | `0.5x`、`1x`、`2x` | 页面默认动画速度（查看者可自行调整）。 |
 | `reduced_animation` | `false` | 布尔值 | 关闭飞行圆点，仅保留链路粗细与计数。 |
 | `inflight_tracking` | `true` | 布尔值 | 实时跟踪排队中与已路由的请求。为 `false` 时仅在请求完成后回放用量记录。 |
-| `layout` | `"tabs"` | `tabs`、`split` | 页面默认布局：可切换的多视图，或上方流向条加下方出口泳道。 |
+| `layout` | `"tabs"` | `tabs`、`split` | 页面默认布局：可切换的多视图，或上方流向条加下方入口泳道。 |
 | `require_key` | `false` | 布尔值 | `false`：数据接口只响应 `Origin`/`Referer` 指向回环地址的请求，仅在 CPA 只监听 `127.0.0.1` 时安全。`true`：页面要求输入管理密钥，并使用短期的内存令牌。 |
 | `api_key_labels` | `{}` | 映射 | 客户端 API Key 的友好名称：键为密钥 sha256 十六进制前缀（至少 8 位），值为标签。 |
 
