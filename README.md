@@ -11,7 +11,7 @@ Live Routes is a dynamic-library plugin for [CLIProxyAPI](https://github.com/rou
 ## Requirements
 
 - CLIProxyAPI v8 or later with dynamic-library plugin support (plugin schema 6). Tested with v8.0.29.
-- One of: macOS arm64/amd64, Linux amd64/arm64, Windows amd64.
+- One of: macOS 12+ arm64/amd64, Linux amd64/arm64, Windows amd64.
 - Plugins are trusted code that CPA loads into its own process, and CPA disables them by default. Set `plugins.enabled: true` in the CPA config before you install.
 - CPA management authentication must have a key configured before the dashboard can load data. Set `remote-management.secret-key` in CPA's `config.yaml`, or set `MANAGEMENT_PASSWORD` in CPA's environment. Without either, data requests return `403` (`remote management key not set`).
 - The dashboard is not available in CPA Home mode, because Home mode disables plugin resource pages.
@@ -164,13 +164,15 @@ Requires Go (see `go.mod`) and a C compiler, because plugins are built with `-bu
 ```sh
 make test                      # go vet + go test -race
 make build                     # host platform -> bin/live-routes.<ext>
-make darwin                    # macOS arm64 + amd64 (needs clang on macOS)
+make darwin                    # macOS arm64 + amd64 (needs clang on macOS; builds a patched Go for amd64, see below)
 make dist VERSION=0.1.0        # dist/live-routes_0.1.0_<goos>_<goarch>.zip + checksums.txt
 make install-local PLUGINS_DIR=/path/to/plugins
 make e2e                       # end-to-end test against a local CPA and a mock upstream
 ```
 
 Linux and Windows builds need a native toolchain; release builds run on native GitHub Actions runners (`.github/workflows/release.yml`) for darwin arm64/amd64, linux amd64/arm64 and windows amd64. Pushing a tag `vX.Y.Z` builds all targets and publishes a release with the zips and `checksums.txt`, which is the layout the CPA plugin store installs from. `store/registry-entry.json` is the entry to submit to a plugin registry.
+
+The darwin/amd64 library must be built with the toolchain from `scripts/darwin-amd64-go.sh`. Stock Go keeps the current goroutine in TLS slot 6 (`0x30(GS)`) on darwin/amd64 in every runtime, so a Go plugin loaded into the Go-built CPA overwrites the host's and CPA crashes; the patched toolchain moves the plugin's to slot 11 (`0x58(GS)`). `scripts/check-darwin.sh` rejects a library that touches slot 6 or targets a macOS newer than 12.0, and the release workflow loads the darwin/amd64 library into the official CPA build on a native Intel runner and runs the e2e suite before publishing.
 
 The e2e script needs `node`, `python3`, `curl` and `lsof`, plus CPA sources next to this repository (override with `CPA_SRC`). It uses a mock upstream only and never touches `~/.cli-proxy-api`.
 

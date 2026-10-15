@@ -20,11 +20,20 @@ build:
 	CGO_ENABLED=1 go build -buildmode=c-shared $(LDFLAGS) -o bin/$(PLUGIN_ID).$(EXT_HOST) .
 	@rm -f bin/$(PLUGIN_ID).h
 
+# darwin/amd64 must be built with the TLS-slot toolchain (scripts/darwin-amd64-go.sh); stock Go crashes CPA there.
+MACOS_MIN := 12.0
+DARWIN_ENV := CGO_ENABLED=1 GOOS=darwin MACOSX_DEPLOYMENT_TARGET=$(MACOS_MIN) CGO_CFLAGS="-O2 -g -mmacosx-version-min=$(MACOS_MIN)" CGO_LDFLAGS="-mmacosx-version-min=$(MACOS_MIN)"
+TLS_GO_DIR ?= $(HOME)/Library/Caches/live-routes-tlsgo
+
 darwin:
 	@mkdir -p bin/darwin_arm64 bin/darwin_amd64
-	CGO_ENABLED=1 GOOS=darwin GOARCH=arm64 CC="clang -arch arm64" go build -buildmode=c-shared $(LDFLAGS) -o bin/darwin_arm64/$(PLUGIN_ID).dylib .
-	CGO_ENABLED=1 GOOS=darwin GOARCH=amd64 CC="clang -arch x86_64" go build -buildmode=c-shared $(LDFLAGS) -o bin/darwin_amd64/$(PLUGIN_ID).dylib .
+	$(DARWIN_ENV) GOARCH=arm64 CC="clang -arch arm64" go build -buildmode=c-shared $(LDFLAGS) -o bin/darwin_arm64/$(PLUGIN_ID).dylib .
+	goroot=$$(scripts/darwin-amd64-go.sh "$(TLS_GO_DIR)") && \
+	  GOROOT="$$goroot" PATH="$$goroot/bin:$$PATH" GOTOOLCHAIN=local $(DARWIN_ENV) GOARCH=amd64 CC="clang -arch x86_64" \
+	  go build -buildmode=c-shared $(LDFLAGS) -o bin/darwin_amd64/$(PLUGIN_ID).dylib .
 	@rm -f bin/darwin_arm64/$(PLUGIN_ID).h bin/darwin_amd64/$(PLUGIN_ID).h
+	scripts/check-darwin.sh bin/darwin_arm64/$(PLUGIN_ID).dylib arm64 $(MACOS_MIN)
+	scripts/check-darwin.sh bin/darwin_amd64/$(PLUGIN_ID).dylib amd64 $(MACOS_MIN)
 
 # Zips every bin/<goos>_<goarch>/ directory present. The library sits at the zip root.
 dist:

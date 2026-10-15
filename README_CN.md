@@ -11,7 +11,7 @@ Live Routes 是 [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI)（CP
 ## 运行要求
 
 - CLIProxyAPI v8 及以上，需支持动态库插件（插件协议 schema 6）。已在 v8.0.29 上测试。
-- 支持的平台：macOS arm64/amd64、Linux amd64/arm64、Windows amd64。
+- 支持的平台：macOS 12+ arm64/amd64、Linux amd64/arm64、Windows amd64。
 - 插件是在 CPA 进程内运行的受信任代码，CPA 默认关闭插件，安装前需在 CPA 配置里设置 `plugins.enabled: true`。
 - 看板加载数据前，CPA 管理鉴权必须已配置密钥。在 CPA 的 `config.yaml` 中设置 `remote-management.secret-key`，或在 CPA 进程环境中设置 `MANAGEMENT_PASSWORD`。两者都未设置时，数据请求返回 `403`（`remote management key not set`）。
 - CPA Home 模式会禁用插件资源页，因此看板在该模式下不可用。
@@ -164,13 +164,15 @@ plugins:
 ```sh
 make test                      # go vet + go test -race
 make build                     # 当前平台 -> bin/live-routes.<ext>
-make darwin                    # macOS arm64 + amd64（macOS 上需要 clang）
+make darwin                    # macOS arm64 + amd64（macOS 上需要 clang；amd64 会先构建打过补丁的 Go，见下文）
 make dist VERSION=0.1.0        # dist/live-routes_0.1.0_<goos>_<goarch>.zip + checksums.txt
 make install-local PLUGINS_DIR=/path/to/plugins
 make e2e                       # 对本地 CPA 与模拟上游做端到端测试
 ```
 
 Linux 与 Windows 版本需要原生工具链；发布构建在原生 GitHub Actions 运行器上完成（`.github/workflows/release.yml`），覆盖 darwin arm64/amd64、linux amd64/arm64 和 windows amd64。推送标签 `vX.Y.Z` 会构建全部目标，并发布包含各平台压缩包与 `checksums.txt` 的 Release，这正是 CPA 插件商店安装所需的布局。`store/registry-entry.json` 是用于提交到插件注册表的条目。
+
+darwin/amd64 动态库必须用 `scripts/darwin-amd64-go.sh` 生成的工具链构建。原版 Go 在 darwin/amd64 上的每个运行时都把当前 goroutine 放在 TLS 槽 6（`0x30(GS)`），Go 插件加载进同样由 Go 构建的 CPA 后会覆盖宿主的值，导致 CPA 崩溃；打过补丁的工具链让插件改用槽 11（`0x58(GS)`）。`scripts/check-darwin.sh` 会拒绝访问槽 6 或最低系统版本高于 macOS 12.0 的动态库；发布流程在原生 Intel 运行器上把 darwin/amd64 动态库加载进官方 CPA 构建并跑完端到端测试后才发布。
 
 e2e 脚本需要 `node`、`python3`、`curl` 和 `lsof`，并要求 CPA 源码与本仓库并列（可用 `CPA_SRC` 覆盖）。脚本只使用模拟上游，不会触碰 `~/.cli-proxy-api`。
 

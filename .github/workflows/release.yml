@@ -15,6 +15,10 @@ permissions:
 
 env:
   PLUGIN_ID: live-routes
+  # Go 1.26's own floor. Left unset, the runner's SDK version becomes the minimum macOS.
+  MACOS_MIN: "12.0"
+  # Official CPA build the darwin/amd64 library is loaded into before it is published.
+  CPA_VERSION: "8.0.29"
 
 jobs:
   build:
@@ -54,6 +58,13 @@ jobs:
       - name: Test
         run: go test ./...
 
+      # Stock Go shares TLS slot 6 with the Go host on darwin/amd64 and crashes CPA.
+      - name: Build patched Go toolchain (darwin/amd64)
+        if: matrix.goos == 'darwin' && matrix.goarch == 'amd64'
+        run: |
+          goroot=$(scripts/darwin-amd64-go.sh "$RUNNER_TEMP/tlsgo")
+          echo "BUILD_GOROOT=$goroot" >> "$GITHUB_ENV"
+
       - name: Build plugin library
         env:
           CGO_ENABLED: "1"
@@ -62,9 +73,37 @@ jobs:
           CC: ${{ matrix.goos == 'windows' && 'gcc' || '' }}
         run: |
           mkdir -p out
-          go build -trimpath -ldflags "-s -w" -buildmode=c-shared -o "out/${PLUGIN_ID}.${{ matrix.ext }}" .
+          if [ "$GOOS" = darwin ]; then
+            export MACOSX_DEPLOYMENT_TARGET="$MACOS_MIN"
+            export CGO_CFLAGS="-O2 -g -mmacosx-version-min=$MACOS_MIN" CGO_LDFLAGS="-mmacosx-version-min=$MACOS_MIN"
+          fi
+          if [ -n "${BUILD_GOROOT:-}" ]; then
+            export GOROOT="$BUILD_GOROOT" PATH="$BUILD_GOROOT/bin:$PATH" GOTOOLCHAIN=local
+          fi
+          go version
+          go build -trimpath -ldflags "-s -w" -buildmode=c-shared -o "out/${PLUGIN_ID}.${{ matrix.ext }}" . 2>&1 | tee build.log
+          test "${PIPESTATUS[0]}" = 0
+          if grep -q 'built for newer' build.log; then echo "objects target a macOS newer than $MACOS_MIN"; exit 1; fi
           rm -f out/*.h
           ls -l out
+
+      - name: Check darwin library
+        if: matrix.goos == 'darwin'
+        run: scripts/check-darwin.sh "out/${PLUGIN_ID}.dylib" "${{ matrix.goarch }}" "$MACOS_MIN"
+
+      # Native Intel runner: the full e2e suite against the official CPA darwin/amd64 build.
+      - name: Load into official CPA (darwin/amd64)
+        if: matrix.goos == 'darwin' && matrix.goarch == 'amd64'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          d="$RUNNER_TEMP/cpa"
+          mkdir -p "$d"
+          gh release download "v$CPA_VERSION" --repo router-for-me/CLIProxyAPI -D "$d" \
+            -p "CLIProxyAPI_${CPA_VERSION}_darwin_amd64.tar.gz" -p checksums.txt
+          (cd "$d" && grep " CLIProxyAPI_${CPA_VERSION}_darwin_amd64.tar.gz\$" checksums.txt | shasum -a 256 -c -)
+          tar -xzf "$d/CLIProxyAPI_${CPA_VERSION}_darwin_amd64.tar.gz" -C "$d" cli-proxy-api
+          CPA_BIN="$d/cli-proxy-api" PLUGIN_BIN="$PWD/out/${PLUGIN_ID}.dylib" bash scripts/e2e/run.sh
 
       - name: Package
         run: |
