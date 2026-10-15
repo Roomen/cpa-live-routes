@@ -3,12 +3,13 @@
   "name": "Live Routes",
   "description": "Real-time request routing dashboard for CLIProxyAPI: watch requests flow from clients through API keys to upstream models, with in-flight state, retries, token usage and session/sub-agent links. Memory only, nothing written to disk. | CLIProxyAPI 实时请求路由看板：实时查看请求从客户端、API Key 到上游模型的流向，含进行中状态、重试、Token 用量与会话/子代理关系。仅占用内存，不写入磁盘。",
   "author": "Roomen",
-  "version": "0.1.0",
   "repository": "https://github.com/Roomen/cpa-live-routes",
   "homepage": "https://github.com/Roomen/cpa-live-routes",
   "license": "MIT",
-  "tags": ["monitoring", "dashboard", "usage"],
-  "install": {
-    "type": "github-release"
-  }
+  "tags": [
+    "Management",
+    "Monitoring",
+    "Dashboard",
+    "Usage"
+  ]
 }
