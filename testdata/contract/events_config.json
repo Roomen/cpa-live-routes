@@ -1,0 +1,1 @@
+{"cursor": "9f3c1a2b:1846", "now": 1760500003000, "dict": {}, "events": [{"seq": 1846, "type": "config", "config": {"active_window_s": 300, "retention_s": 1800, "max_records": 5000, "animation_speed": "2x", "reduced_animation": true, "inflight_tracking": true, "layout": "split", "require_key": false}}]}

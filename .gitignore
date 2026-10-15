@@ -1,0 +1,5 @@
+bin/
+dist/
+*.h
+node_modules/
+web/test/out/
