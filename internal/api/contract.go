@@ -9,28 +9,14 @@ package api
 // history paging moved from a T0 bound to an opaque cursor.
 const ContractVersion = 2
 
-// Routes. Resource paths are relative to /v0/resource/plugins/<PluginID>/ and are
-// not authenticated by CPA; the plugin gates every data route itself:
-//   - require_key=false (default): served only when the request Host is loopback
-//     (127.0.0.1, localhost, [::1], any port); otherwise 403 Error{Code:"forbidden_host"}.
-//   - require_key=true: TokenHeader must carry a token from ManagementSessionPath;
-//     otherwise 401 Error{Code:"unauthorized"}, and the page asks for the management key.
-//
-// Management paths are relative to /v0/management/ and require the management key.
+// Resource paths serve static UI only. Management paths require CPA's management
+// authentication and are relative to /v0/management.
 const (
-	PluginID = "live-routes"
-
-	ResourcePagePath     = "/live"         // GET, HTML page; ?demo=1 runs offline with simulated data
-	ResourceSnapshotPath = "/api/snapshot" // GET, gated
-	ResourceEventsPath   = "/api/events"   // GET ?since=<cursor>, gated
-	ResourceRecordsPath  = "/api/records"  // GET ?before=<cursor>&limit=<n<=2000>, gated; no before = from the newest record
-
-	ManagementSessionPath  = "/live-routes/session"  // POST, exchanges the management key for a view token
-	ManagementSnapshotPath = "/live-routes/snapshot" // GET, same body as ResourceSnapshotPath, for scripts
-
-	// TokenHeader carries the view token on gated resource routes. Tokens are never
-	// accepted from cookies, query strings or the URL.
-	TokenHeader = "X-Live-Routes-Token"
+	PluginID               = "live-routes"
+	ResourcePagePath       = "/live"                 // GET, HTML; ?demo=1 runs offline
+	ManagementSnapshotPath = "/live-routes/snapshot" // GET
+	ManagementEventsPath   = "/live-routes/events"   // GET ?since=<cursor>
+	ManagementRecordsPath  = "/live-routes/records"  // GET ?before=<cursor>&limit=<n<=2000>
 )
 
 // Enumerations used by the page.
@@ -68,7 +54,7 @@ type Config struct {
 	ReducedAnimation bool   `json:"reduced_animation"` // no flying dots, only link widths and counters
 	InflightTracking bool   `json:"inflight_tracking"` // false: usage replay only, no queued/routed states
 	Layout           string `json:"layout"`            // LayoutTabs | LayoutSplit; default for the page
-	RequireKey       bool   `json:"require_key"`       // data routes need a view token instead of a loopback Host
+	RequireKey       bool   `json:"require_key"`       // always true; legacy configuration cannot disable management authentication
 }
 
 // Dictionary entries. IDs start at 1; a reference of 0 (field absent) means unknown.
@@ -166,14 +152,14 @@ type Stats struct {
 
 // Snapshot is the full state. Records holds every in-flight record plus the newest
 // completed ones (at most 5000); Truncated reports that older records exist and can be
-// fetched through ResourceRecordsPath.
+// fetched through ManagementRecordsPath.
 type Snapshot struct {
 	V         int      `json:"v"`
 	Epoch     string   `json:"epoch"`          // random per plugin process
 	Cursor    string   `json:"cursor"`         // "<epoch>:<seq>", opaque to the page
 	Now       int64    `json:"now"`            // server clock, for skew correction
 	Oldest    int64    `json:"oldest"`         // smallest T0 among the records kept, 0 when empty (records can arrive out of T0 order)
-	Next      string   `json:"next,omitempty"` // with Truncated: the ResourceRecordsPath "before" cursor that continues past the loaded records
+	Next      string   `json:"next,omitempty"` // with Truncated: the ManagementRecordsPath "before" cursor that continues past the loaded records
 	Config    Config   `json:"config"`
 	Dict      Dict     `json:"dict"`
 	Records   []Record `json:"records"`
@@ -190,7 +176,7 @@ type Event struct {
 	Config *Config  `json:"config,omitempty"`
 }
 
-// Events answers ResourceEventsPath. Reset means the cursor is unusable (other epoch,
+// Events answers ManagementEventsPath. Reset means the cursor is unusable (other epoch,
 // older than the retained change log, or ahead of the server) and the page must fetch
 // a new Snapshot. More means the response was capped at 2000 events; poll again at once.
 type Events struct {
@@ -202,7 +188,7 @@ type Events struct {
 	Events []Event `json:"events"`
 }
 
-// RecordsPage answers ResourceRecordsPath: up to limit records that arrived before
+// RecordsPage answers ManagementRecordsPath: up to limit records that arrived before
 // the position "before" names, newest arrival first (not T0 order). Following Next
 // returns every kept record exactly once, also with equal or out-of-order T0;
 // records evicted meanwhile are skipped. A cursor from another epoch gives an
@@ -215,19 +201,9 @@ type RecordsPage struct {
 	Next    string   `json:"next,omitempty"` // present exactly when More: pass it as "before"
 }
 
-// SessionToken answers ManagementSessionPath.
-type SessionToken struct {
-	Token     string `json:"token"`
-	ExpiresAt int64  `json:"expires_at"` // Unix ms
-	TTLS      int    `json:"ttl_s"`
-}
-
-// Error is the body of every non-2xx response. Gated routes answer 401 "unauthorized"
-// (require_key=true and the token is missing or invalid; the page asks for the
-// management key, keeps the token in memory only) or 403 "forbidden_host"
-// (require_key=false and the Host is not loopback; the page explains how to enable
-// require_key).
+// Error is the body of plugin errors. CPA handles authentication errors before
+// dispatching requests to the plugin.
 type Error struct {
-	Code    string `json:"code"` // "unauthorized" | "forbidden_host" | "bad_request" | "not_found"
+	Code    string `json:"code"` // "bad_request" | "not_found"
 	Message string `json:"message"`
 }

@@ -13,6 +13,7 @@ Live Routes 是 [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI)（CP
 - CLIProxyAPI v8 及以上，需支持动态库插件（插件协议 schema 6）。已在 v8.0.29 上测试。
 - 支持的平台：macOS arm64/amd64、Linux amd64/arm64、Windows amd64。
 - 插件是在 CPA 进程内运行的受信任代码，CPA 默认关闭插件，安装前需在 CPA 配置里设置 `plugins.enabled: true`。
+- 看板加载数据前，CPA 管理鉴权必须已配置密钥。在 CPA 的 `config.yaml` 中设置 `remote-management.secret-key`，或在 CPA 进程环境中设置 `MANAGEMENT_PASSWORD`。两者都未设置时，数据请求返回 `403`（`remote management key not set`）。
 - CPA Home 模式会禁用插件资源页，因此看板在该模式下不可用。
 
 ## 安装
@@ -83,8 +84,8 @@ Expand-Archive $zip -DestinationPath plugins\windows\amd64 -Force   # live-route
 
 | 现象 | 原因 / 处理 |
 | --- | --- |
-| `403 forbidden_host` | 没有通过回环地址打开页面。请用 `127.0.0.1` 或 `localhost` 访问，或设置 `require_key: true`。 |
-| 页面要求输入管理密钥 | 已开启 `require_key: true`。输入 CPA 管理密钥后，会换成只保存在页面内存里的短期令牌。 |
+| 数据接口返回 `403 remote management key not set` | CPA 尚未配置管理密钥。在 CPA 的 `config.yaml` 中设置 `remote-management.secret-key`，或在 CPA 进程环境中设置 `MANAGEMENT_PASSWORD`，然后重试。 |
+| 数据接口返回 401，或 `403` 提示 IP 被封禁 | 输入已配置的 CPA 管理密钥。同一 IP 连续输错 5 次会被封禁 30 分钟；封禁期间该 IP 的请求返回 403，等待封禁结束后重试。远程访问还需启用 CPA 远程管理。密钥仅保存在页面内存中，刷新后需重新输入。 |
 | 没有"排队/路由中"状态，客户端显示未知 | `inflight_tracking` 为 `false`，只展示已完成请求的用量记录。 |
 | 看不到客户端 IP | CPA 不把客户端地址传给插件，只有在反向代理设置了 `X-Forwarded-For` / `X-Real-IP` 时才显示。 |
 | 数据消失了 | CPA 或插件重启过，或数据超出了 `retention_minutes` / `max_records`。数据只存在内存里，这是设计行为。 |
@@ -103,7 +104,6 @@ Expand-Archive $zip -DestinationPath plugins\windows\amd64 -Force   # live-route
 | `reduced_animation` | `false` | 布尔值 | 关闭飞行圆点，仅保留链路粗细与计数。 |
 | `inflight_tracking` | `true` | 布尔值 | 实时跟踪排队中与已路由的请求。为 `false` 时仅在请求完成后回放用量记录。 |
 | `layout` | `"tabs"` | `tabs`、`split` | 页面默认布局：可切换的多视图，或上方流向条加下方入口泳道。 |
-| `require_key` | `false` | 布尔值 | `false`：数据接口只响应 `Origin`/`Referer` 指向回环地址的请求，仅在 CPA 只监听 `127.0.0.1` 时安全。`true`：页面要求输入管理密钥，并使用短期的内存令牌。 |
 | `api_key_labels` | `{}` | 映射 | 客户端 API Key 的友好名称：键为密钥 sha256 十六进制前缀（至少 8 位），值为标签。 |
 
 无需在文件中暴露密钥即可计算前缀：
@@ -125,12 +125,15 @@ plugins:
 
 ## 访问模型
 
-CPA 不会对插件资源页做鉴权，因此插件自己给数据接口加了门禁。
+静态页面由 `GET /v0/resource/plugins/live-routes/live` 提供，不携带 CPA 数据。数据接口属于 CPA 管理路由：
 
-- 默认（`require_key: false`）：`GET /v0/resource/plugins/live-routes/api/{snapshot,events,records}` 只在请求的 `Origin`（没有时看 `Referer`）指向 `127.0.0.1`、`localhost` 或 `::1` 时响应，其他情况返回 `403 forbidden_host`。页面本身是静态的，不携带数据。
-- CPA 不会把客户端地址和 `Host` 头传给插件，所以这道检查依赖的请求头可以被任何非浏览器客户端伪造，只能挡住其他机器上的浏览器。只要 CPA 监听的不是 `127.0.0.1`（CPA 默认 `host: ""` 会监听所有网卡），就必须设置 `require_key: true`。
-- `require_key: true`：页面首次访问时要求输入管理密钥，并通过 `POST /v0/management/live-routes/session` 换取仅存于内存的令牌，之后以 `X-Live-Routes-Token` 头发送。页面与插件都不会保存密钥。没有有效令牌时，数据接口返回 `401 unauthorized`。通过域名或反向代理访问 CPA 时请使用此模式。
-- 脚本可用管理密钥读取同样的快照：`GET /v0/management/live-routes/snapshot`，管理密钥放在 `Authorization` 的 bearer 头中。
+- `GET /v0/management/live-routes/snapshot`
+- `GET /v0/management/live-routes/events`
+- `GET /v0/management/live-routes/records`
+
+请在 CPA 的 `config.yaml` 中设置 `remote-management.secret-key`，或在 CPA 进程环境中设置 `MANAGEMENT_PASSWORD`，以启用管理鉴权。两者都未设置时，数据请求返回 `403 remote management key not set`。每次数据请求都必须在 bearer 形式的 `Authorization` 头中携带有效的 CPA 管理密钥，由 CPA 执行管理鉴权；本机回环访问也不例外。页面只在内存中持有输入的密钥，不写入浏览器持久存储，刷新后需重新输入。脚本也使用同样的 bearer 头。通过域名或反向代理访问时，还需启用 CPA 远程管理。
+
+迁移说明：旧资源数据接口 `/v0/resource/plugins/live-routes/api/{snapshot,events,records}` 返回 404，旧配置 `require_key` 会被忽略。
 
 客户端 API Key 在插件内部脱敏：只暴露形如 `sk-...3f9a` 的掩码和简短指纹，不会暴露原始密钥。凭证标签中的邮箱地址也会被掩码处理。
 

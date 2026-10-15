@@ -2,12 +2,9 @@ package api
 
 import (
 	"encoding/json"
-	"net"
 	"net/http"
-	"net/url"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/Roomen/cpa-live-routes/internal/store"
 )
@@ -39,53 +36,36 @@ type AuthLister func(callbackID string) ([]store.AuthEntry, error)
 
 // Server routes plugin HTTP calls.
 type Server struct {
-	Store  *store.Store
-	Tokens *TokenStore
-	Auths  AuthLister
-	Now    func() time.Time
-	Page   []byte
+	Store *store.Store
+	Auths AuthLister
+	Page  []byte
 }
 
-// Handle serves one request. The path is matched by suffix, so it works for both
-// the management and the resource prefixes.
+// Handle serves only registered, exact paths. CPA authenticates management
+// requests before forwarding them; resource requests can only retrieve the page.
 func (s *Server) Handle(req Request) Response {
 	p := strings.TrimRight(req.Path, "/")
-	switch {
-	case strings.HasSuffix(p, ManagementSessionPath):
-		if req.Method != http.MethodPost {
-			return errorResponse(http.StatusMethodNotAllowed, "bad_request", "use POST")
-		}
-		return s.session()
-	case strings.HasSuffix(p, ManagementSnapshotPath):
+	switch p {
+	case "/v0/resource/plugins/" + PluginID + ResourcePagePath:
 		if req.Method != http.MethodGet {
 			return errorResponse(http.StatusMethodNotAllowed, "bad_request", "use GET")
 		}
-		return s.snapshot(req)
-	case strings.HasSuffix(p, ResourcePagePath):
 		return s.page()
-	case strings.HasSuffix(p, ResourceSnapshotPath), strings.HasSuffix(p, ResourceEventsPath), strings.HasSuffix(p, ResourceRecordsPath):
+	case "/v0/management" + ManagementSnapshotPath,
+		"/v0/management" + ManagementEventsPath,
+		"/v0/management" + ManagementRecordsPath:
 		if req.Method != http.MethodGet {
 			return errorResponse(http.StatusMethodNotAllowed, "bad_request", "use GET")
 		}
-		if denied := s.gate(req); denied != nil {
-			return *denied
-		}
-		switch {
-		case strings.HasSuffix(p, ResourceSnapshotPath):
+		switch p {
+		case "/v0/management" + ManagementSnapshotPath:
 			return s.snapshot(req)
-		case strings.HasSuffix(p, ResourceEventsPath):
+		case "/v0/management" + ManagementEventsPath:
 			return s.events(req)
 		}
 		return s.records(req)
 	}
 	return errorResponse(http.StatusNotFound, "not_found", "unknown route")
-}
-
-func (s *Server) session() Response {
-	tok, exp := s.Tokens.Issue()
-	return jsonResponse(http.StatusOK, mustJSON(SessionToken{
-		tok, exp.UnixMilli(), int(tokenTTL / time.Second),
-	}))
 }
 
 func (s *Server) page() Response {
@@ -99,50 +79,6 @@ func (s *Server) page() Response {
 		},
 		Body: s.Page,
 	}
-}
-
-func (s *Server) gate(req Request) *Response {
-	if s.Store.Config().RequireKey {
-		if s.Tokens.Valid(headerValue(req.Headers, TokenHeader)) {
-			return nil
-		}
-		r := errorResponse(http.StatusUnauthorized, "unauthorized", "a view token from the management session is required")
-		return &r
-	}
-	if !loopbackRequest(req.Headers) {
-		r := errorResponse(http.StatusForbidden, "forbidden_host", "the live view is served to loopback hosts only; enable require_key to use it remotely")
-		return &r
-	}
-	return nil
-}
-
-// loopbackRequest checks the Host header. The host process does not forward
-// Host to plugins today, so Origin and then Referer stand in for it; with none
-// of them the request is refused.
-func loopbackRequest(h map[string][]string) bool {
-	if host := headerValue(h, "Host"); host != "" {
-		return isLoopbackHost(host)
-	}
-	for _, name := range []string{"Origin", "Referer"} {
-		if v := headerValue(h, name); v != "" {
-			u, err := url.Parse(v)
-			return err == nil && isLoopbackHost(u.Host)
-		}
-	}
-	return false
-}
-
-func isLoopbackHost(hostport string) bool {
-	host := hostport
-	if h, _, err := net.SplitHostPort(hostport); err == nil {
-		host = h
-	}
-	host = strings.Trim(host, "[]")
-	switch strings.ToLower(host) {
-	case "127.0.0.1", "localhost", "::1":
-		return true
-	}
-	return false
 }
 
 func (s *Server) refreshExits(callbackID string) {
@@ -199,15 +135,6 @@ func errorResponse(status int, code, msg string) Response {
 func mustJSON(v any) []byte {
 	b, _ := json.Marshal(v)
 	return b
-}
-
-func headerValue(h map[string][]string, name string) string {
-	for k, v := range h {
-		if strings.EqualFold(k, name) && len(v) > 0 {
-			return v[0]
-		}
-	}
-	return ""
 }
 
 func queryValue(q map[string][]string, name string) string {

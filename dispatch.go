@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"sync"
-	"time"
 
 	"github.com/Roomen/cpa-live-routes/internal/api"
 	"github.com/Roomen/cpa-live-routes/internal/config"
@@ -51,7 +50,7 @@ type plugin struct {
 func newPlugin(host hostFunc) *plugin {
 	st := store.New(config.Default(), nil)
 	p := &plugin{st: st, host: host, inflight: true, schema: schemaVersion}
-	p.srv = &api.Server{Store: st, Tokens: api.NewTokenStore(nil), Now: time.Now, Page: web.IndexHTML, Auths: p.listAuths}
+	p.srv = &api.Server{Store: st, Page: web.IndexHTML, Auths: p.listAuths}
 	return p
 }
 
@@ -185,14 +184,12 @@ func managementRegistration() any {
 		Resources []resource `json:"resources"`
 	}{
 		Routes: []route{
-			{"POST", api.ManagementSessionPath},
 			{"GET", api.ManagementSnapshotPath},
+			{"GET", api.ManagementEventsPath},
+			{"GET", api.ManagementRecordsPath},
 		},
 		Resources: []resource{
 			{Path: api.ResourcePagePath, Menu: "Live Routes", Description: "Live view of client, session, rule and exit credential routing."},
-			{Path: api.ResourceSnapshotPath},
-			{Path: api.ResourceEventsPath},
-			{Path: api.ResourceRecordsPath},
 		},
 	}
 }

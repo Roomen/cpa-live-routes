@@ -120,7 +120,7 @@ func TestParseCompletionLifecycleManagement(t *testing.T) {
 	if err != nil || string(l.ConfigYAML) != "layout: split" || l.SchemaVersion != 6 {
 		t.Fatalf("%+v %v", l, err)
 	}
-	m, err := ParseManagement([]byte(`{"Method":"GET","Path":"/v0/resource/plugins/live-routes/api/events","Headers":{"Host":["127.0.0.1:8317"]},"Query":{"since":["a:1"]},"Body":null,"host_callback_id":"cb"}`))
+	m, err := ParseManagement([]byte(`{"Method":"GET","Path":"/v0/management/live-routes/events","Headers":{"Host":["127.0.0.1:8317"]},"Query":{"since":["a:1"]},"Body":null,"host_callback_id":"cb"}`))
 	if err != nil || m.Headers["Host"][0] != "127.0.0.1:8317" || m.Query["since"][0] != "a:1" || m.HostCallbackID != "cb" {
 		t.Fatalf("%+v %v", m, err)
 	}

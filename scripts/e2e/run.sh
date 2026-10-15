@@ -30,8 +30,8 @@ WORK="$(mktemp -d "${TMPDIR:-/tmp}/lr-e2e.XXXXXX")"
 KEY1="sk-e2e-test-key-ONE-aaaa1111"
 KEY2="sk-e2e-test-key-TWO-bbbb2222"
 MGMT="e2e-mgmt-secret-9f3a"
+WRONG_MGMT="invalid-e2e-management-key"
 UPSTREAM_KEY="mock-upstream-key"
-BOGUS_VAL=bogus
 PASS=0
 FAIL=0
 FAILED_NAMES=()
@@ -176,9 +176,26 @@ start_cpa() {
 
 BASE() { echo "http://127.0.0.1:$PORT"; }
 RES() { echo "$(BASE)/v0/resource/plugins/live-routes"; }
-# CPA does not forward the Host header to plugins; the plugin derives the host from Origin/Referer like a browser page does.
+MGMT_API() { echo "$(BASE)/v0/management/live-routes"; }
 REF_LOCAL() { echo "Referer: http://127.0.0.1:$PORT/v0/resource/plugins/live-routes/live"; }
-REF_REMOTE() { echo "Referer: http://192.168.1.2:$PORT/v0/resource/plugins/live-routes/live"; }
+
+# Exercise CPA's actual management middleware, including legacy require_key=false.
+check_auth_routes() {
+  local endpoint code
+  for endpoint in snapshot events records; do
+    code=$(curl -s -o /dev/null -w '%{http_code}' -H "$(REF_LOCAL)" "$(MGMT_API)/$endpoint")
+    { [ "$code" = 401 ] || [ "$code" = 403 ]; } && ok "$endpoint without management key rejected" || bad "$endpoint without management key rejected" "HTTP $code"
+    code=$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer ${WRONG_MGMT}" "$(MGMT_API)/$endpoint")
+    { [ "$code" = 401 ] || [ "$code" = 403 ]; } && ok "$endpoint with wrong management key rejected" || bad "$endpoint with wrong management key rejected" "HTTP $code"
+    code=$(curl -s -o "$WORK/auth-$endpoint.json" -w '%{http_code}' -H "Authorization: Bearer ${MGMT}" "$(MGMT_API)/$endpoint")
+    [ "$code" = 200 ] && ok "$endpoint with management key succeeds" || bad "$endpoint with management key succeeds" "HTTP $code"
+    grep -q -F "$MGMT" "$WORK/auth-$endpoint.json" && bad "$endpoint does not echo management key" || ok "$endpoint does not echo management key"
+    code=$(curl -s -o /dev/null -w '%{http_code}' -H "$(REF_LOCAL)" -H "Authorization: Bearer ${MGMT}" "$(RES)/api/$endpoint")
+    [ "$code" = 404 ] && ok "old resource $endpoint route is removed" || bad "old resource $endpoint route is removed" "HTTP $code"
+  done
+  code=$(curl -s -o /dev/null -w '%{http_code}' -X POST -H "Authorization: Bearer ${MGMT}" "$(MGMT_API)/session")
+  [ "$code" = 404 ] && ok "session exchange route is removed" || bad "session exchange route is removed" "HTTP $code"
+}
 
 uuid() { python3 -c 'import uuid;print(uuid.uuid4())'; }
 
@@ -238,7 +255,8 @@ fi
 step "A. plugin enabled, require_key=false, inflight_tracking=true"
 start_cpa true true false
 
-check "plugin snapshot route answers on loopback" curl -sf -H "$(REF_LOCAL)" "$(RES)/api/snapshot"
+check "management snapshot route answers with key" curl -sf -H "Authorization: Bearer ${MGMT}" "$(MGMT_API)/snapshot"
+check_auth_routes
 check "plugin page route answers" curl -sf "$(RES)/live"
 
 S_CLAUDE="$(uuid)"
@@ -254,7 +272,7 @@ codex_req "$WORK/r_429.out" limited "$KEY2" "$S_CODEX" >"$WORK/r_429.code" &
 P_429=$!
 
 sleep 2.5
-curl -s -H "$(REF_LOCAL)" "$(RES)/api/snapshot" >"$WORK/snap_mid.json"
+curl -s -H "Authorization: Bearer ${MGMT}" "$(MGMT_API)/snapshot" >"$WORK/snap_mid.json"
 python3 - "$WORK/snap_mid.json" <<'PY' && ok "in-flight record visible (queued or routed) while slow stream runs" || bad "in-flight record visible while slow stream runs" "$(head -c 400 "$WORK/snap_mid.json")"
 import json, sys
 s = json.load(open(sys.argv[1]))
@@ -269,7 +287,7 @@ wait $P_SLOW $P_AGENT $P_CODEX $P_429
 [ "$(cat "$WORK/r_429.code")" = 429 ] && ok "limited alias returned 429" || bad "limited alias" "HTTP $(cat "$WORK/r_429.code")"
 sleep 0.5
 
-curl -s -H "$(REF_LOCAL)" "$(RES)/api/snapshot" >"$WORK/snap_end.json"
+curl -s -H "Authorization: Bearer ${MGMT}" "$(MGMT_API)/snapshot" >"$WORK/snap_end.json"
 python3 - "$WORK/snap_end.json" <<'PY' && ok "done records carry token usage" || bad "done records carry token usage"
 import json, sys
 s = json.load(open(sys.argv[1]))
@@ -298,7 +316,7 @@ assert "claude-code" in kinds and "codex" in kinds, kinds
 PY
 
 CURSOR="$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["cursor"])' "$WORK/snap_mid.json")"
-curl -s -H "$(REF_LOCAL)" "$(RES)/api/events?since=$CURSOR" >"$WORK/events.json"
+curl -s -H "Authorization: Bearer ${MGMT}" "$(MGMT_API)/events?since=$CURSOR" >"$WORK/events.json"
 python3 - "$WORK/events.json" <<'PY' && ok "events since mid-run cursor return changes" || bad "events since mid-run cursor return changes" "$(head -c 300 "$WORK/events.json")"
 import json, sys
 e = json.load(open(sys.argv[1]))
@@ -306,22 +324,17 @@ assert not e.get("reset"), "reset"
 assert len(e["events"]) > 0
 PY
 EC="$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["cursor"])' "$WORK/events.json")"
-curl -s -H "$(REF_LOCAL)" "$(RES)/api/events?since=$EC" >"$WORK/events2.json"
+curl -s -H "Authorization: Bearer ${MGMT}" "$(MGMT_API)/events?since=$EC" >"$WORK/events2.json"
 python3 -c 'import json,sys;e=json.load(open(sys.argv[1]));assert not e.get("reset") and e["events"]==[]' "$WORK/events2.json" \
   && ok "events at head cursor are empty" || bad "events at head cursor are empty"
 
 LEAK=0
 for f in snap_mid.json snap_end.json events.json events2.json; do
   for k in "$KEY1" "$KEY2" "$MGMT" "${UPSTREAM_KEY}"; do
-    grep -q -F "$k" "$WORK/$f" && LEAK=1 && echo "    leaked $k in $f"
+    grep -q -F "$k" "$WORK/$f" && LEAK=1 && echo "    raw credential found in $f"
   done
 done
 [ "$LEAK" = 0 ] && ok "raw API keys never appear in snapshot/events" || bad "raw API keys never appear in snapshot/events"
-
-code=$(curl -s -o "$WORK/forbidden.json" -w '%{http_code}' -H "$(REF_REMOTE)" "$(RES)/api/snapshot")
-{ [ "$code" = 403 ] && grep -q forbidden_host "$WORK/forbidden.json"; } && ok "non-loopback Referer gets 403 forbidden_host" || bad "non-loopback Referer gets 403 forbidden_host" "HTTP $code $(head -c 200 "$WORK/forbidden.json")"
-code=$(curl -s -o "$WORK/forbidden2.json" -w '%{http_code}' "$(RES)/api/snapshot")
-{ [ "$code" = 403 ] && grep -q forbidden_host "$WORK/forbidden2.json"; } && ok "no Origin/Referer gets 403 forbidden_host" || bad "no Origin/Referer gets 403 forbidden_host" "HTTP $code $(head -c 200 "$WORK/forbidden2.json")"
 
 # runtime file inventory (plugin enabled)
 lsof_regular() { # lsof_regular <pid> -> sorted regular file paths
@@ -341,20 +354,7 @@ lsof_regular "$CPA_PID" >"$WORK/files_enabled.txt"
 # ---------------------------------------------------------------------------- phase B
 step "B. require_key=true"
 start_cpa true true true
-code=$(curl -s -o "$WORK/b401.json" -w '%{http_code}' "$(RES)/api/snapshot")
-{ [ "$code" = 401 ] && grep -q unauthorized "$WORK/b401.json"; } && ok "snapshot without token -> 401 unauthorized" || bad "snapshot without token -> 401" "HTTP $code"
-code=$(curl -s -o /dev/null -w '%{http_code}' -H "X-Live-Routes-Token: ${BOGUS_VAL}" "$(RES)/api/snapshot")
-[ "$code" = 401 ] && ok "bogus token -> 401" || bad "bogus token -> 401" "HTTP $code"
-code=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$(BASE)/v0/management/live-routes/session")
-{ [ "$code" = 401 ] || [ "$code" = 403 ]; } && ok "session without management key refused ($code)" || bad "session without management key refused" "HTTP $code"
-curl -s -X POST -H "Authorization: Bearer ${MGMT}" "$(BASE)/v0/management/live-routes/session" >"$WORK/session.json"
-VIEW_TOK="$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["token"])' "$WORK/session.json" 2>/dev/null)"
-[ -n "${VIEW_TOK}" ] && ok "management key exchanged for a view token" || bad "management key exchanged for a view token" "$(head -c 300 "$WORK/session.json")"
-code=$(curl -s -o "$WORK/b200.json" -w '%{http_code}' -H "X-Live-Routes-Token: ${VIEW_TOK}" "$(RES)/api/snapshot")
-[ "$code" = 200 ] && ok "snapshot with token -> 200" || bad "snapshot with token -> 200" "HTTP $code"
-code=$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer ${MGMT}" "$(BASE)/v0/management/live-routes/snapshot")
-[ "$code" = 200 ] && ok "management snapshot with key -> 200" || bad "management snapshot with key -> 200" "HTTP $code"
-grep -q -F "$MGMT" "$WORK/session.json" "$WORK/b200.json" && bad "management key not echoed" || ok "management key not echoed"
+check_auth_routes
 
 # ---------------------------------------------------------------------------- phase C
 step "C. runtime files: plugin disabled vs enabled"

@@ -13,6 +13,7 @@ Live Routes is a dynamic-library plugin for [CLIProxyAPI](https://github.com/rou
 - CLIProxyAPI v8 or later with dynamic-library plugin support (plugin schema 6). Tested with v8.0.29.
 - One of: macOS arm64/amd64, Linux amd64/arm64, Windows amd64.
 - Plugins are trusted code that CPA loads into its own process, and CPA disables them by default. Set `plugins.enabled: true` in the CPA config before you install.
+- CPA management authentication must have a key configured before the dashboard can load data. Set `remote-management.secret-key` in CPA's `config.yaml`, or set `MANAGEMENT_PASSWORD` in CPA's environment. Without either, data requests return `403` (`remote management key not set`).
 - The dashboard is not available in CPA Home mode, because Home mode disables plugin resource pages.
 
 ## Install
@@ -83,8 +84,8 @@ To update, replace the library file and restart CPA. To uninstall, set `plugins.
 
 | Symptom | Cause / fix |
 | --- | --- |
-| `403 forbidden_host` | The page was not opened through a loopback address. Use `127.0.0.1`/`localhost`, or set `require_key: true`. |
-| The page asks for the management key | `require_key: true` is set. Enter the CPA management key; it is exchanged for a short-lived token kept in page memory only. |
+| Data returns `403 remote management key not set` | CPA has no management key configured. Set `remote-management.secret-key` in CPA's `config.yaml`, or set `MANAGEMENT_PASSWORD` in CPA's environment, then retry. |
+| Data returns 401, or `403` says the IP is banned | Enter the configured CPA management key. Five failed key attempts from the same IP trigger a 30-minute ban; requests from that IP return 403 until the ban expires. Remote access also requires CPA remote management to be enabled. The page keeps the key in memory only, so enter it again after a reload. |
 | No "queued / routing" state, client shows as unknown | `inflight_tracking` is `false`, so only completed requests (usage records) are shown. |
 | Client IP is missing | CPA does not pass the client address to plugins. It is shown only behind a reverse proxy that sets `X-Forwarded-For` / `X-Real-IP`. |
 | Data disappeared | CPA or the plugin restarted, or the data aged out of `retention_minutes` / `max_records`. Data is memory-only by design. |
@@ -103,7 +104,6 @@ All options live under `plugins.configs.live-routes`. The **配置** button on t
 | `reduced_animation` | `false` | boolean | No flying dots, only link widths and counters. |
 | `inflight_tracking` | `true` | boolean | Track queued and routed requests live. When `false` the plugin only replays usage records after completion. |
 | `layout` | `"tabs"` | `tabs`, `split` | Default page layout: switchable views, or flow strip above entry lanes. |
-| `require_key` | `false` | boolean | `false`: data routes answer requests whose `Origin`/`Referer` points at a loopback host; safe only when CPA listens on `127.0.0.1`. `true`: the page asks for the management key and uses a short-lived in-memory token. |
 | `api_key_labels` | `{}` | map | Friendly names for client API keys: sha256 hex prefix (at least 8 characters) of the key to a label. |
 
 Compute a key prefix without exposing the key in a file:
@@ -125,12 +125,15 @@ plugins:
 
 ## Access model
 
-The plugin gates its own data routes because CPA does not authenticate plugin resource pages.
+The static page is served at `GET /v0/resource/plugins/live-routes/live` and carries no CPA data. Data endpoints are CPA management routes:
 
-- Default (`require_key: false`): `GET /v0/resource/plugins/live-routes/api/{snapshot,events,records}` answer only when the request's `Origin` (or, without it, `Referer`) points at `127.0.0.1`, `localhost` or `::1`; anything else gets `403 forbidden_host`. The page itself is static and carries no data.
-- CPA does not pass the client address or the `Host` header to plugins, so this check relies on headers that any non-browser client can forge. It only stops browsers on other machines. If CPA listens on anything other than `127.0.0.1` (CPA's default `host: ""` listens on all interfaces), set `require_key: true`.
-- `require_key: true`: the page asks for the management key once and exchanges it (`POST /v0/management/live-routes/session`) for a token kept in memory only and sent as `X-Live-Routes-Token`. The key is never stored by the page or the plugin. Without a valid token the data routes answer `401 unauthorized`. Use this when you reach CPA through a domain name or a reverse proxy.
-- Scripts can read the same snapshot with the management key: `GET /v0/management/live-routes/snapshot` with the management key in a bearer `Authorization` header.
+- `GET /v0/management/live-routes/snapshot`
+- `GET /v0/management/live-routes/events`
+- `GET /v0/management/live-routes/records`
+
+Configure CPA management authentication with `remote-management.secret-key` in `config.yaml` or `MANAGEMENT_PASSWORD` in CPA's environment. If neither is set, data requests return `403 remote management key not set`. Every data request must send a valid CPA management key in a bearer `Authorization` header and pass CPA management authentication, including requests over loopback. The page holds the entered key in memory only, never in persistent browser storage; a reload requires entering it again. Scripts use the same bearer header. Access through a domain or reverse proxy also requires CPA remote management to be enabled.
+
+For migration, the old resource data routes `/v0/resource/plugins/live-routes/api/{snapshot,events,records}` return 404, and legacy `require_key` is ignored.
 
 Client API keys are redacted inside the plugin: only a mask such as `sk-...3f9a` and a short fingerprint are exposed, never the raw key. E-mail addresses in credential labels are masked.
 
