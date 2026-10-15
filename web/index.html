@@ -62,7 +62,7 @@ h1{font-size:18px;margin:0;font-weight:650;letter-spacing:.01em}
 .chip{background:var(--bg-card);border:1px solid var(--border-color);border-radius:10px;padding:6px 12px;min-width:104px}
 .chip small{display:block;font-size:11px;color:var(--text-quaternary)}
 .chip b{font-size:16px;font-weight:600}
-.main{display:grid;grid-template-columns:minmax(0,1fr) 330px;gap:12px;align-items:start}
+.main{display:grid;grid-template-columns:minmax(0,1fr) 330px;gap:12px;align-items:stretch}
 .panel{background:var(--bg-card);border:1px solid var(--border-color);border-radius:12px;box-shadow:var(--shadow)}
 .mainp{overflow:hidden;min-width:0}
 .phead{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;padding:9px 12px;border-bottom:1px solid var(--border-color)}
@@ -83,10 +83,11 @@ h1{font-size:18px;margin:0;font-weight:650;letter-spacing:.01em}
 .tip div{display:flex;justify-content:space-between;gap:14px;color:var(--text-quaternary)}
 .tip div span:last-child{color:var(--text-primary);text-align:right;word-break:break-all;min-width:0}
 .tip .bad{color:var(--error)!important}.tip .good{color:var(--success)!important}
-.feed{align-self:stretch;min-width:0;overflow:hidden;display:flex;flex-direction:column;max-height:760px}
+.feed{min-width:0;overflow:hidden;display:flex;flex-direction:column;contain:size;min-height:320px}
 .feed h2{margin:0;padding:12px 14px;font-size:13px;font-weight:600;border-bottom:1px solid var(--border-color);display:flex;justify-content:space-between;flex:none}
 .feed h2 span{font-weight:400;color:var(--text-faint);font-size:12px}
-#list{list-style:none;margin:0;padding:0;overflow:hidden;flex:1}
+#list{list-style:none;margin:0;padding:0;overflow:hidden;flex:1;min-height:0;display:flex;flex-direction:column;flex-wrap:wrap;align-content:flex-start}
+#list>li{flex:none;width:100%;box-sizing:border-box}
 .row{padding:8px 14px;border-bottom:1px solid var(--border-color);overflow:hidden}
 .row:last-child{border-bottom:0}
 .r1,.r2,.r3{display:flex;align-items:center;gap:8px;min-width:0}
@@ -109,7 +110,8 @@ h1{font-size:18px;margin:0;font-weight:650;letter-spacing:.01em}
 .gate .bad{color:var(--error)}
 @media (max-width:900px){
   .main{grid-template-columns:minmax(0,1fr)}
-  .feed{max-height:none}
+  .feed{contain:none;min-height:0}
+  #list{display:block}
   #list li:nth-child(n+9){display:none}
   .spacer{display:none}
   #segLayout{display:none}
