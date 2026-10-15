@@ -6,7 +6,8 @@
 #   --dry-run     build CPA, check the mock, generate the config, print it, start nothing
 #   --only-infra  build, start mock + CPA (plugin disabled), send one request through CPA, stop
 #   --keep        keep the scratch directory
-# Env: CPA_SRC (default ../CLIProxyAPI next to this repo), CPA_BIN (prebuilt binary, skips the build)
+# Env: CPA_SRC (default ../CLIProxyAPI next to this repo), CPA_BIN (prebuilt binary, skips the build),
+#      PLUGIN_BIN (prebuilt plugin library for this host, skips `make build`)
 set -u
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -83,9 +84,10 @@ node --check "$ROOT/scripts/e2e/mock-upstream.mjs" && ok "mock upstream syntax" 
 
 PLUGIN_LIB=""
 step "build plugin"
-if make -C "$ROOT" build >"$WORK/plugin-build.log" 2>&1 && [ -f "$ROOT/bin/live-routes.$EXT" ]; then
+PLUGIN_SRC="${PLUGIN_BIN:-$ROOT/bin/live-routes.$EXT}"
+if { [ -n "${PLUGIN_BIN:-}" ] || make -C "$ROOT" build >"$WORK/plugin-build.log" 2>&1; } && [ -f "$PLUGIN_SRC" ]; then
   mkdir -p "$WORK/plugins/$GOOS_H/$GOARCH_H"
-  cp "$ROOT/bin/live-routes.$EXT" "$WORK/plugins/$GOOS_H/$GOARCH_H/"
+  cp "$PLUGIN_SRC" "$WORK/plugins/$GOOS_H/$GOARCH_H/live-routes.$EXT"
   PLUGIN_LIB="$WORK/plugins/$GOOS_H/$GOARCH_H/live-routes.$EXT"
   ok "plugin built and installed"
 else
