@@ -2,6 +2,9 @@ name: release
 
 on:
   push:
+    # main builds and tests only; it also saves the darwin/amd64 toolchain cache that tag runs restore.
+    branches:
+      - main
     tags:
       - "v*"
   workflow_dispatch:
@@ -59,6 +62,19 @@ jobs:
         run: go test ./...
 
       # Stock Go shares TLS slot 6 with the Go host on darwin/amd64 and crashes CPA.
+      - name: Resolve Go version (darwin/amd64)
+        id: gover
+        if: matrix.goos == 'darwin' && matrix.goarch == 'amd64'
+        run: echo "v=$(go env GOVERSION)" >> "$GITHUB_OUTPUT"
+
+      # Building the toolchain takes about 6 minutes; it only changes with the Go version or the script.
+      - name: Cache patched Go toolchain (darwin/amd64)
+        if: matrix.goos == 'darwin' && matrix.goarch == 'amd64'
+        uses: actions/cache@v5
+        with:
+          path: ${{ runner.temp }}/tlsgo
+          key: tlsgo-${{ runner.os }}-${{ runner.arch }}-${{ steps.gover.outputs.v }}-${{ hashFiles('scripts/darwin-amd64-go.sh') }}
+
       - name: Build patched Go toolchain (darwin/amd64)
         if: matrix.goos == 'darwin' && matrix.goarch == 'amd64'
         run: |
