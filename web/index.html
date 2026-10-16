@@ -57,6 +57,13 @@ h1{font-size:18px;margin:0;font-weight:650;letter-spacing:.01em}
 .seg button{border:0;border-radius:0;border-right:1px solid var(--border-color)}
 .seg button:last-child{border-right:0}
 .seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-contrast)}
+.ctl{gap:4px}
+.ctl .btn,.ctl .seg button{font-size:11px;color:var(--text-faint);background:transparent;border-color:transparent;padding:3px 8px}
+.ctl .seg{background:transparent;border-color:transparent;margin-left:6px;padding-left:6px;border-left:1px solid var(--border-color);border-radius:0}
+.ctl .seg button,.ctl .seg button:last-child{border:0}
+.ctl .btn:hover,.ctl .seg button:hover,.ctl:focus-within .btn,.ctl:focus-within .seg button{color:var(--text-quaternary)}
+.ctl .btn:hover,.ctl .seg button:hover{border-color:transparent;background:var(--bg-tertiary);color:var(--text-primary)}
+.ctl .btn[aria-pressed="true"],.ctl .seg button[aria-pressed="true"]{background:var(--bg-tertiary);color:var(--text-primary);border-color:transparent}
 :focus-visible{outline:2px solid var(--info);outline-offset:1px}
 .chips{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
 .chip{background:var(--bg-card);border:1px solid var(--border-color);border-radius:10px;padding:6px 12px;min-width:104px}
@@ -158,7 +165,7 @@ h1{font-size:18px;margin:0;font-weight:650;letter-spacing:.01em}
     <div class="chip"><small id="lReq">区间请求</small><b class="mono" id="cReq">0</b></div>
     <div class="chip"><small>进行中</small><b class="mono" id="cInf">0</b></div>
     <div class="chip"><small>成功率</small><b class="mono" id="cOk">—</b></div>
-    <div class="chip"><small>tokens/s</small><b class="mono" id="cTps">0</b></div>
+    <div class="chip" title="输出 token ÷ 实际生成时长（各请求首字到结束的并集，不含空闲）"><small>输出 tok/s</small><b class="mono" id="cTps">0</b></div>
     <div class="chip"><small>平均延迟</small><b class="mono" id="cLat">—</b></div>
   </div>
   <section class="panel gate" id="gate" hidden>
@@ -178,7 +185,7 @@ h1{font-size:18px;margin:0;font-weight:650;letter-spacing:.01em}
         </div>
         <span class="muted" id="rangeInfo"></span>
         <button class="btn" id="bNow" hidden>回到现在</button>
-        <div class="legend" id="legend" aria-label="harness / 客户端图例"></div>
+        <div class="legend" id="legend" aria-label="模型图例"></div>
       </div>
       <div class="box" id="boxF"><canvas id="cvF" aria-label="入口（OAuth / API）、CPA 规则、harness / 客户端、会话流向"></canvas></div>
       <div class="box" id="boxT"><canvas id="cvT" aria-label="按入口分道的请求时间线"></canvas></div>
@@ -297,6 +304,9 @@ const mini = () => W < 560 && effLayout() !== 'split';
 const cliShort = id => { const c = D.clients.get(id); if (!c) return cliName(id); const w = (c.label || '').split(/\s+/)[0]; return w || c.kind; };
 const exitShort = id => { const l = exitName(id), i = l.indexOf('@'); return i > 0 ? l.slice(0, i + 3) + '…' : l; };
 const cliColor = id => C.cl[((id || 1) - 1 + 6) % 6];
+/* timeline bars are coloured by upstream model; a model keeps the colour it first got for the life of the page */
+const mdlIdx = new Map(), mdlOf = id => { const r = D.rules.get(id); return r ? r.model : ''; };
+const mdlColor = id => { const m = mdlOf(id); if (!m) return C.faint; let i = mdlIdx.get(m); if (i == null) mdlIdx.set(m, i = mdlIdx.size); return C.cl[i % 6]; };
 const stLabel = r => ({ queued: '排队', routed: '路由中', done: '成功', failed: '失败' + (r.status ? ' ' + r.status : ''), canceled: '取消', rejected: '拒绝', lost: '丢失' }[r.state] || r.state);
 const stClass = r => r.state === 'done' ? 'ok' : r.state === 'failed' ? 'err' : isLive(r.state) ? 'run' : 'cx';
 
@@ -319,28 +329,68 @@ function trackFlight(prev, r) {
 }
 
 /* ---------- flow model ---------- */
-const expanded = new Set();
+/* expanded = clients showing their sessions, derived on every compute: shown unless the user collapsed it, or it would need more than SMAX session rows and the user did not open it */
+const expanded = new Set(), collapsed = new Set(), opened = new Set(), SMAX = 6, KID_MS = 90000, KIDS = 3;
 const PN = new Map();
 let F = { nodes: new Map(), edges: new Map(), paths: new Map(), lists: { c: [], s: [], r: [], x: [] }, sig: '', totX: 0, nIn: 0 };
 let hub = { x: 0, y: 0, w: 0, h: 0, ry0: 0, rh: 28, hdr: 40, foot: 24 };
-let lastCompute = 0, computeVer = -1, nodeAnim = false, hover = null, rel = null, G = null, relSig = '';
-/* a request starts at its session (when its client is expanded), then client, rule and exit */
-const pathKeys = r => { const c = r.client || 0, k = r.session && expanded.has(c) ? ['s' + r.session, 'c' + c] : ['c' + c]; k.push('r' + (r.rule || 0)); if (r.exit) k.push('x' + r.exit); return k; };
+let lastCompute = 0, computeVer = -1, nodeAnim = false, hover = null, rel = null, G = null, relSig = '', sKey = new Map();
+/* the host never reports a closed session: last activity is now while a request is in flight, else its newest t1||t0; sub-agents close after KID_MS idle, roots after rootTtl() */
+const rootTtl = () => Math.max(cfg.active_window_s * 1000, Math.min(1800000, cfg.retention_s * 1000));
+/* a request starts at its open session's row (when its client is expanded), then client, rule and exit */
+const pathKeys = r => { const c = r.client || 0, sk = r.session && expanded.has(c) && sKey.get(r.session), k = sk ? [sk, 'c' + c] : ['c' + c]; k.push('r' + (r.rule || 0)); if (r.exit) k.push('x' + r.exit); return k; };
 
 function computeFlow(t) {
-  const winMs = cfg.active_window_s * 1000, rg = rangeMs, L = getList();
+  const winMs = cfg.active_window_s * 1000, rg = rangeMs, L = getList(), H = rootTtl();
   const found = new Map(), edges = new Map(), paths = new Map();
-  const handle = r => {
+  /* liveness pass: per session last activity and client, per anchor (root session, or a client's sessionless traffic) its newest record */
+  const act = new Map(), scli = new Map(), newest = new Map(), cutH = t - H - 120000;
+  const seen = r => {
+    const a = isLive(r.state) ? t : (r.t1 || r.t0), s = r.session;
+    if (s && !(act.get(s) >= a)) { act.set(s, a); scli.set(s, r.client || 0); }
+    const ak = s ? 's' + s : 'c' + (r.client || 0), o = newest.get(ak); if (!o || a > o.a) newest.set(ak, { r, a });
+  };
+  for (let i = L.length - 1; i >= 0 && L[i].t0 >= cutH; i--) seen(L[i]);
+  for (const id of inflight) { const r = recs.get(id); if (r && r.t0 < cutH) seen(r); }
+  const parOf = s => { const e = D.sessions.get(s); return e && e.parent || 0; }, sub = new Map();
+  for (const [s, a] of act) { const p = parOf(s); if (p && act.has(p)) sub.set(p, Math.max(sub.get(p) || 0, a)); }
+  const open = new Set(); for (const [s, a] of act) if (parOf(s) ? t - a < KID_MS : t - Math.max(a, sub.get(s) || 0) < H) open.add(s);
+  /* an open sub-agent keeps every ancestor open, even one whose own records are older than the scan; such an ancestor gets an idle stand-in on its child's path */
+  for (const s of [...open]) {
+    const base = newest.get('s' + s).r;
+    for (let q = s, p = parOf(s), n = 0; p && n < 8; q = p, p = parOf(p), n++) {
+      open.add(p); if (!(act.get(p) >= act.get(q))) act.set(p, act.get(q)); if (!scli.has(p)) scli.set(p, scli.get(q));
+      if (!newest.has('s' + p)) newest.set('s' + p, { r: Object.assign({}, base, { session: p, state: 'done', t1: base.t1 || base.t0 }), a: -Infinity });
+    }
+  }
+  /* session tree per client: each child right under its root; more than KIDS+1 children fold the rest into one 's-<root>' row */
+  const kidsOf = new Map(), roots = [], cOpen = new Map(), rows = new Map(), sMeta = new Map(); sKey = new Map();
+  for (const s of [...open].sort((a, b) => a - b)) {
+    const p = parOf(s), c = scli.get(s);
+    if (p && open.has(p) && scli.get(p) === c) { if (!kidsOf.has(p)) kidsOf.set(p, []); kidsOf.get(p).push(s); } else roots.push(s);
+    if (!cOpen.has(c)) cOpen.set(c, new Set()); cOpen.get(c).add(s);
+  }
+  let o = 0;
+  for (const r of roots) {
+    const ks = [], vis = new Set([r]), walk = p => { for (const k of kidsOf.get(p) || []) if (!vis.has(k)) { vis.add(k); ks.push(k); walk(k); } }; walk(r);
+    const show = ks.length > KIDS + 1 ? ks.slice(0, KIDS) : ks, fold = ks.slice(show.length);
+    sKey.set(r, 's' + r); sMeta.set('s' + r, { o: o++, par: 0, kids: ks.length, kidIds: ks, act: Math.max(act.get(r), ...ks.map(k => act.get(k))) });
+    show.forEach((k, i) => { sKey.set(k, 's' + k); sMeta.set('s' + k, { o: o++, par: r }); });
+    if (fold.length) { fold.forEach(k => sKey.set(k, 's-' + r)); sMeta.set('s-' + r, { o: o++, par: r, fold }); }
+    const c = scli.get(r); rows.set(c, (rows.get(c) || 0) + 1 + show.length + (fold.length ? 1 : 0));
+  }
+  expanded.clear(); for (const [c, nr] of rows) if (opened.has(c) || (!collapsed.has(c) && nr <= SMAX)) expanded.add(c);
+  const handle = (r, ghost) => {
     const live = isLive(r.state), last = live ? t : (r.t1 || r.t0);
-    if (t - last > winMs) return;
-    const inr = r.t0 >= t - rg && r.t0 <= t, wgt = live ? 1 : Math.exp(-Math.max(0, t - r.t0) / 60000), bad = r.state === 'failed';
+    if (!ghost && t - last > winMs) return;
+    const inr = !ghost && r.t0 >= t - rg && r.t0 <= t, wgt = ghost ? 0 : live ? 1 : Math.exp(-Math.max(0, t - r.t0) / 60000), bad = !ghost && r.state === 'failed';
     const keys = pathKeys(r);
     for (const key of keys) {
       let n = found.get(key);
       if (!n) found.set(key, n = { key, type: key[0], id: +key.slice(1), cli: r.client || 0, last: 0, n: 0, ok: 0, fail: 0, tok: 0, lat: 0, inf: 0, t429: 0, sess: new Set() });
       if (last > n.last) n.last = last;
       if (inr) { n.n++; if (r.state === 'done') { n.ok++; n.lat += r.lat || ((r.t1 || t) - r.t0); } else if (bad) n.fail++; if (r.tok) n.tok += r.tok.total || 0; }
-      if (live) n.inf++;
+      if (live && !ghost) n.inf++;
       if (r.status === 429 && t - last < 120000) n.t429 = Math.max(n.t429, last);
       if (key[0] === 'c' && r.session) n.sess.add(r.session);
     }
@@ -349,21 +399,29 @@ function computeFlow(t) {
       if (!e) edges.set(ek, e = { k: ek, a: keys[i], b: keys[i + 1], w: 0, ew: 0 });
       e.w += wgt; if (bad) e.ew += wgt;
     }
-    if (inr) { const pk = keys.join('>'); if (!paths.has(pk)) paths.set(pk, keys); }
+    if (inr || ghost) { const pk = keys.join('>'); if (!paths.has(pk)) paths.set(pk, keys); }
   };
   const cut = t - Math.max(winMs, 300000, rg) - 120000;
   for (let i = L.length - 1; i >= 0 && L[i].t0 >= cut; i--) handle(L[i]);
   for (const id of inflight) { const r = recs.get(id); if (r && r.t0 < cut) handle(r); }
+  /* open sessions (and sessionless clients) quiet for longer than the active window stay as idle nodes on the path they last used */
+  for (const [ak, { r, a }] of newest) if (t - a > winMs && (ak[0] === 'c' ? t - a < H : open.has(+ak.slice(1)))) handle(r, true);
   const nodes = new Map(); let totX = 0;
   for (const [key, s] of found) {
-    const frac = (t - s.last) / winMs, alpha = frac < .8 ? 1 : clamp((1 - frac) / .2, 0, 1);
+    const m = key[0] === 's' ? sMeta.get(key) : null; if (key[0] === 's' && !m) continue;
+    if (m && m.act > s.last) s.last = m.act; // a parent is as recent as its newest child
+    const idle = t - s.last, kid = !!(m && m.par);
+    let alpha = 1 - .4 * clamp((idle - winMs * .8) / (winMs * .2), 0, 1);
+    if (kid) alpha *= clamp((KID_MS - idle) / 10000, 0, 1); // closed sub-agents fade out over their last 10 s
     if (alpha <= 0.01) continue;
     let n = PN.get(key); const fresh = !n;
     if (!n) PN.set(key, n = { key, x: 0, y: 0, ty: 0, w: 0, h: 0 });
-    Object.assign(n, s, { alpha, fresh });
+    Object.assign(n, s, { alpha, fresh, fading: kid && idle > KID_MS - 10000, idle: idle > winMs ? idle : 0, kid, o: m ? m.o : 0, par: m ? m.par : 0, kids: m && m.kids || 0, kidIds: m && m.kidIds || [], fold: m && m.fold || null, kinf: 0 });
+    if (n.type === 'c') n.sess = cOpen.get(n.id) || new Set();
     nodes.set(key, n);
     if (n.type === 'x') totX += n.n;
   }
+  for (const n of nodes.values()) if (n.kid) { const p = nodes.get('s' + n.par); if (p) p.kinf += n.inf; else n.kid = false; }
   for (const k of [...PN.keys()]) if (!nodes.has(k)) PN.delete(k);
   for (const e of [...edges.keys()]) { const x = edges.get(e), a = nodes.get(x.a), b = nodes.get(x.b); if (!a || !b) edges.delete(e); else x.alpha = Math.min(a.alpha, b.alpha); }
   const ls = { c: [], s: [], r: [], x: [] };
@@ -372,9 +430,9 @@ function computeFlow(t) {
   const cIdx = new Map(ls.c.map((n, i) => [n.id, i]));
   /* sessions are grouped by the client their requests came from, so each group can sit in its client's band */
   const cOf = n => cIdx.has(n.cli) ? cIdx.get(n.cli) : ls.c.length;
-  ls.s.sort((a, b) => { const sa = D.sessions.get(a.id) || {}, sb = D.sessions.get(b.id) || {}; return (cOf(a) - cOf(b)) || (!!sa.parent - !!sb.parent) || a.id - b.id; });
+  ls.s.sort((a, b) => (cOf(a) - cOf(b)) || a.o - b.o);
   ls.x.sort((a, b) => exitProv(a.id).localeCompare(exitProv(b.id)) || exitName(a.id).localeCompare(exitName(b.id)) || a.id - b.id);
-  const sig = [ls.c, ls.s, ls.r, ls.x].map(a => a.map(n => n.type === 's' ? n.key + '@' + n.cli : n.key).join(',')).join('|') + '#' + W + effLayout() + (dpr | 0) + D.rules.size;
+  const sig = [ls.c, ls.s, ls.r, ls.x].map(a => a.map(n => n.type === 's' ? n.key + '@' + n.cli + (n.kid ? '^' : '') : n.key).join(',')).join('|') + '#' + W + effLayout() + (dpr | 0) + D.rules.size;
   F = { nodes, edges, paths, lists: ls, sig: F.sig, totX, nIn: 0 };
   if (sig !== F.sig) { F.sig = sig; layoutFlow(); }
   else for (const n of nodes.values()) if (n.fresh) { n.y = n.ty; }
@@ -421,7 +479,8 @@ function layoutFlow() {
   for (const b of bands) {
     const m = Math.max(1, b.ss.length);
     if (b.c) put(b.c, gb.y0 + (k + (m - 1) / 2) * gb.step, cx, cwR, gb);
-    b.ss.forEach((n, i) => put(n, gb.y0 + (k + i) * gb.step, sx, swR, gb));
+    /* children sit indented right under their root, on slightly shorter cards */
+    b.ss.forEach((n, i) => { const ind = n.kid ? Math.round(Math.min(16, swR * .14)) : 0; put(n, gb.y0 + (k + i) * gb.step, sx + ind, swR - ind, gb); if (n.kid) n.h = Math.round(n.h * .8); });
     k += m;
   }
   ls.r.forEach((n, i) => { n.ry = hub.ry0 + i * rh + (rh - 3) / 2; n.y = n.ry; n.ty = n.ry; });
@@ -441,15 +500,22 @@ function buildPath(r) {
     const na = F.nodes.get(keys[i]), nb = F.nodes.get(keys[i + 1]); if (!na || !nb) return null;
     const p0 = portOut(na), p3 = portIn(nb); segs.push(bzg(p0, p3));
     if (nb.type === 'r') { const o = portOut(nb); segs.push([p3, p3, o, o]); hubIdx = segs.length - 1; }
+    else if (nb.type === 'c' && i + 2 < keys.length) { const o = portOut(nb); segs.push([p3, p3, o, o]); } /* pass straight through a client card to its left port */
   }
-  if (hubIdx < 0 || !segs.length) return null;
-  return { segs, hf: (hubIdx + .5) / segs.length };
+  if (hubIdx < 1 || !segs.length) return null;
+  return { segs, hf: (hubIdx + .5) / segs.length, qi: hubIdx - 1 };
+}
+/* resting spot: exactly on the port where the link meets the card (rule row's right port while queued, exit card's right edge once routed);
+   k > 0 spreads extra waiting requests ALONG the link just outside the port, 7px apart, so they never leave the line */
+function restS(pth, k, routed) {
+  const m = pth.segs.length, si = routed ? m - 1 : pth.qi, sg = pth.segs[si], du = Math.min(.3, k * 7 / (1.5 * Math.max(40, Math.abs(sg[3].x - sg[0].x))));
+  return (si + 1 - du) / m;
 }
 function posAt(pth, s) {
   const m = pth.segs.length, v = clamp(s, 0, 1) * m, i = Math.min(m - 1, Math.floor(v));
   return bezAt(pth.segs[i], v - i);
 }
-const resolveS = (pth, nm) => nm === 'client' ? 0 : nm === 'hub' ? pth.hf : 1;
+const resolveS = (pth, nm, k) => nm === 'client' ? 0 : restS(pth, k || 0, nm !== 'hub');
 
 /* ---------- canvas setup ---------- */
 const cvF = $('#cvF'), fctx = cvF.getContext('2d'), cvT = $('#cvT'), tctx = cvT.getContext('2d'), tip = $('#tip');
@@ -467,7 +533,9 @@ const dimN = n => !rel ? 1 : rel.N.has(n.key) ? 1 : .28;
 /* ---------- flow drawing ---------- */
 function drawLinks() {
   F.edges.forEach(e => {
-    const vis = clamp(e.w / .3, 0, 1); if (vis < .02) return;
+    const vis = clamp(e.w / .3, 0, 1);
+    /* a quiet path (idle session, decayed rate) stays as a dashed hairline so its nodes are not left disconnected */
+    if (vis < .02) { const g = edgeG(e); X.globalAlpha = .5 * Math.min(e.alpha, 1) * (!rel ? 1 : rel.E.has(e.k) ? 1 : .3); X.strokeStyle = mix(C.border, C.faint, .35); X.lineWidth = 1; X.setLineDash([3, 3]); X.beginPath(); X.moveTo(g[0].x, g[0].y); X.bezierCurveTo(g[1].x, g[1].y, g[2].x, g[2].y, g[3].x, g[3].y); X.stroke(); X.setLineDash([]); return; }
     const g = edgeG(e), er = e.ew / (e.w + .001), d = !rel ? 1 : rel.E.has(e.k) ? 1 : .22, lw = linkW(e) + (rel && d === 1 ? 1 : 0), na = Math.min(e.alpha, 1) * vis;
     X.lineCap = 'round'; X.lineWidth = lw;
     const path = () => { X.beginPath(); X.moveTo(g[0].x, g[0].y); X.bezierCurveTo(g[1].x, g[1].y, g[2].x, g[2].y, g[3].x, g[3].y); };
@@ -487,7 +555,7 @@ function drawNode(n) {
   const small = W < 560 || effLayout() === 'split', x = n.x, y = n.y - n.h / 2, w = n.w, h = n.h;
   X.save(); X.globalAlpha = clamp(n.alpha, 0, 1) * dimN(n);
   nodeBox(n);
-  const bf = `10px ${MONO}`, badge = '×' + n.n + (n.inf ? ' ●' + n.inf : ''); X.font = bf; const bw = X.measureText(badge).width, px = x + (small ? 8 : 11), iw = w - (small ? 16 : 22);
+  const bf = `10px ${MONO}`, badge = n.idle ? '空闲 ' + Math.floor(n.idle / 60000) + ' 分' : '×' + n.n + (n.inf ? ' ●' + n.inf : ''); X.font = bf; const bw = X.measureText(badge).width, px = x + (small ? 8 : 11), iw = w - (small ? 16 : 22);
   const f1 = `600 ${small ? 10.5 : 11.5}px ${SANS}`, f2 = `${small ? 9.5 : 11}px ${SANS}`, three = h >= 52;
   const l1 = three ? y + 15 : y + h * .32, l2 = three ? y + 33 : y + h * .72;
   if (n.type === 'c') {
@@ -502,10 +570,13 @@ function drawNode(n) {
     else if (three) { txt(cliSub(n.id), px, l2, f2, C.muted, iw); if (tg) txt(tg, px, y + h - 11, f2, C.info, iw); }
     else { X.font = f2; const tw2 = tg ? X.measureText(tg).width + 6 : 0; txt(cliSub(n.id), px, l2, f2, C.muted, iw - tw2); if (tg) txt(tg, px + iw, l2, f2, C.info, 0, 'right'); }
   } else if (n.type === 's') {
-    const ss = D.sessions.get(n.id), par = ss && ss.parent && D.sessions.get(ss.parent);
-    txt((par ? '↳ ' : '') + sessShort(n.id), px, l1, `600 ${small ? 10 : 11}px ${MONO}`, C.text, iw - bw - 4);
-    txt(badge, px + iw, l1, bf, C.faint, 0, 'right');
-    txt(par ? '父 ' + par.short : '会话', px, l2, f2, C.muted, iw);
+    const ss = D.sessions.get(n.id), par = !n.kid && ss && ss.parent && D.sessions.get(ss.parent), p = n.kid && F.nodes.get('s' + n.par), one = h < 30;
+    /* tree connector down the indent gutter from the root card; the last child's line ends at it (└), earlier ones are crossed (├) */
+    if (p) { const gx = Math.round(p.x + (x - p.x) / 2) + .5; X.strokeStyle = mix(C.border, C.faint, .75); X.lineWidth = 1; X.beginPath(); X.moveTo(gx, p.y + p.h / 2); X.lineTo(gx, n.y); X.lineTo(x, n.y); X.stroke(); }
+    const nm = n.fold ? '+' + n.fold.length + ' 子代理' : (par ? '↳ ' : '') + sessShort(n.id);
+    txt(nm, px, one ? y + h / 2 : l1, `600 ${small || n.kid ? 10 : 11}px ${n.fold ? SANS : MONO}`, n.kid ? C.muted : C.text, iw - bw - 4);
+    txt(badge, px + iw, one ? y + h / 2 : l1, bf, C.faint, 0, 'right');
+    if (!one) txt(n.fold ? '已折叠 · 悬停查看' : n.kid ? '子代理' : par ? '父 ' + par.short : n.kids ? '含 ' + n.kids + ' 子代理' + (n.kinf ? ' · ●' + n.kinf : '') : '会话', px, l2, f2, n.kids && !n.kid ? C.info : C.muted, iw);
   } else {
     const r = small ? 11 : 16, lw = small ? 3.5 : 4.5, rcx = x + (small ? 7 : 10) + r + lw / 2, rcy = y + h / 2, ring = h >= 30 && !mini();
     let tx = x + (small ? 8 : 11);
@@ -557,20 +628,21 @@ function drawChrome() {
   if (split) return;
   const ly = FH - 16, lf = `${small ? 9.5 : 11}px ${SANS}`; let lx = small ? 8 : 16;
   for (const [c, t] of [[C.ok, '成功'], [C.err, '失败'], [C.info, '进行中']]) { X.fillStyle = c; X.beginPath(); X.arc(lx + 3, ly, 3, 0, 7); X.fill(); txt(t, lx + 10, ly, lf, C.faint); X.font = lf; lx += 10 + X.measureText(t).width + 12; }
-  if (!small) txt('线宽 = 近 60 秒请求速率（指数衰减）· 环 = 区间流量占比 / 失败 · 点击客户端展开会话', W - 16, ly, lf, C.faint, 0, 'right');
+  if (!small) txt('线宽 = 近 60 秒请求速率（指数衰减）· 环 = 区间流量占比 / 失败 · 点击客户端展开 / 收起会话', W - 16, ly, lf, C.faint, 0, 'right');
 }
 function drawFlights() {
   if (!animOn()) return;
   const sp = speedVal(), pulse = (animT * sp / 900) % 1;
   const draw = (r, pth, s, col, rad, alpha) => { const p = posAt(pth, s); X.globalAlpha = alpha; X.fillStyle = col; X.beginPath(); X.arc(p.x, p.y, rad, 0, 7); X.fill(); return p; };
+  const rk = new Map(), cnt = new Map(), waitQ = r => r.state === 'queued' || !r.exit;
+  for (const id of inflight) { const r = recs.get(id); if (!r) continue; const key = waitQ(r) ? 'q' + r.rule : 'x' + r.exit, k = cnt.get(key) || 0; cnt.set(key, k + 1); rk.set(id, Math.min(k, 5)); }
   for (const id of inflight) {
     const r = recs.get(id); if (!r) continue;
     const f = flights.get(id); if (f) continue;
     const pth = buildPath(r); if (!pth) continue;
-    const s = r.state === 'queued' || !r.exit ? pth.hf : 1, jit = ((id.charCodeAt(id.length - 1) || 0) % 7 - 3) * 1.6;
-    const p = posAt(pth, s), py = p.y + jit;
-    X.globalAlpha = (1 - pulse) * .6; X.strokeStyle = C.info; X.lineWidth = 1.5; X.beginPath(); X.arc(p.x, py, 4 + pulse * 12, 0, 7); X.stroke();
-    X.globalAlpha = .95; X.fillStyle = C.info; X.beginPath(); X.arc(p.x, py, 3.6, 0, 7); X.fill();
+    const p = posAt(pth, restS(pth, rk.get(id) || 0, !waitQ(r)));
+    X.globalAlpha = (1 - pulse) * .6; X.strokeStyle = C.info; X.lineWidth = 1.5; X.beginPath(); X.arc(p.x, p.y, 4 + pulse * 12, 0, 7); X.stroke();
+    X.globalAlpha = .95; X.fillStyle = C.info; X.beginPath(); X.arc(p.x, p.y, 3.6, 0, 7); X.fill();
   }
   for (const [id, f] of [...flights]) {
     const r = recs.get(id), u = (animT - f.t0) / f.dur;
@@ -580,7 +652,7 @@ function drawFlights() {
       continue;
     }
     const pth = buildPath(r); if (!pth) { flights.delete(id); continue; }
-    const a = resolveS(pth, f.from), b = resolveS(pth, f.to), e = ease(u);
+    const a = resolveS(pth, f.from), b = resolveS(pth, f.to, rk.get(id)), e = ease(u);
     if (f.kind === 'fwd') {
       const rad = clamp((Math.log10(Math.max(100, (r.tok && r.tok.in) || 5000)) - 2.5) * 2 + 2.5, 2.5, 6);
       for (let i = 9; i >= 0; i--) { const q = 1 - i / 10; draw(r, pth, a + (b - a) * ease(clamp(u - i * .035, 0, 1)), C.info, rad * (.4 + .6 * q), Math.pow(q, 1.4) * .9); }
@@ -604,7 +676,7 @@ function drawFlow(t) {
   X = fctx; sizeCv(cvF, W, FH);
   X.setTransform(dpr, 0, 0, dpr, 0, 0); X.clearRect(0, 0, W, FH); X.fillStyle = C.card; X.fillRect(0, 0, W, FH);
   if (!G) layoutFlow();
-  if (!F.nodes.size) { txt('近 ' + Math.round(cfg.active_window_s / 60) + ' 分钟内暂无请求', W / 2, FH / 2, `13px ${SANS}`, C.faint, 0, 'center'); return; }
+  if (!F.nodes.size) { txt('近 ' + Math.round(rootTtl() / 60000) + ' 分钟没有会话 · 插件只能看到加载后经过 CPA 的请求', W / 2, FH / 2, `13px ${SANS}`, C.faint, W - 32, 'center'); return; }
   drawChrome(); drawLinks();
   for (const n of F.lists.c) drawNode(n);
   for (const n of F.lists.s) drawNode(n);
@@ -626,10 +698,11 @@ function hitFlow(mx, my) {
 }
 function computeRel() {
   if (!hover || hover.k === 'hub') { rel = null; return; }
-  const N = new Set(), E = new Set();
+  const N = new Set(), E = new Set(), hk = new Set([hover.k]);
+  if (hover.n && hover.n.kids) for (const n of F.lists.s) if (n.kid && n.par === hover.n.id) hk.add(n.key); // a root highlights its children's paths too
   F.paths.forEach(keys => {
     let m = false;
-    if (hover.e) { for (let i = 0; i < keys.length - 1; i++) if (keys[i] + '>' + keys[i + 1] === hover.k) m = true; } else m = keys.includes(hover.k);
+    if (hover.e) { for (let i = 0; i < keys.length - 1; i++) if (keys[i] + '>' + keys[i + 1] === hover.k) m = true; } else m = keys.some(k => hk.has(k));
     if (m) { keys.forEach(k => N.add(k)); for (let i = 0; i < keys.length - 1; i++) E.add(keys[i] + '>' + keys[i + 1]); }
   });
   rel = { N, E };
@@ -642,12 +715,15 @@ function nodeTip(h) {
   const n = h.n, rate = n.ok + n.fail >= 1 ? (n.ok / (n.ok + n.fail) * 100).toFixed(1) + '%' : '—';
   let s = `<b>${esc(nodeTitle(n))}</b>`;
   if (n.type === 'c') { const c = D.clients.get(n.id); s += trow('harness', c ? c.kind : '—') + trow('密钥 / IP', cliSub(n.id) || '—') + trow('会话数', n.sess.size) + (n.sess.size ? trow('', expanded.has(n.id) ? '点击收起会话' : '点击展开会话') : ''); }
-  if (n.type === 's') { const ss = D.sessions.get(n.id) || {}, par = ss.parent && D.sessions.get(ss.parent); s += trow('会话 ID', ss.sid || '—') + trow('父会话', par ? par.sid : '无'); }
+  const ks = a => a.slice(0, 4).map(sessShort).join(' ') + (a.length > 4 ? ' …+' + (a.length - 4) : '');
+  if (n.type === 's' && n.fold) s += trow('折叠的子代理', ks(n.fold)) + trow('父会话', sessShort(n.par));
+  else if (n.type === 's') { const ss = D.sessions.get(n.id) || {}, par = ss.parent && D.sessions.get(ss.parent); s += trow('会话 ID', ss.sid || '—') + trow('父会话', par ? par.sid : '无') + (n.kids ? trow('子代理 (' + n.kids + ')', ks(n.kidIds)) + trow('子代理进行中', n.kinf) : ''); }
+  if (n.idle) s += trow('空闲', Math.floor(n.idle / 60000) + ' 分钟');
   if (n.type === 'x') s += trow('凭证', exitSub(n.id) || '—') + (n.t429 ? trow('近期 429', fmtClock(n.t429, true), 'bad') : '');
   if (n.type === 'r') s += trow('规则', ruleLabel(n.id));
   return s + trow('请求 (' + rangeLabel() + ')', n.n) + trow('进行中', n.inf) + trow('成功率', n.ok + n.fail >= 3 ? rate : '—') + trow('tokens', fmtK(n.tok)) + trow('平均延迟', n.ok >= 3 ? (n.lat / n.ok / 1000).toFixed(1) + 's' : '—');
 }
-const nodeTitle = n => !n ? '' : n.type === 'c' ? cliName(n.id) : n.type === 's' ? sessShort(n.id) : n.type === 'r' ? ruleLabel(n.id) : exitName(n.id);
+const nodeTitle = n => !n ? '' : n.type === 'c' ? cliName(n.id) : n.type === 's' ? (n.fold ? '+' + n.fold.length + ' 子代理' : sessShort(n.id)) : n.type === 'r' ? ruleLabel(n.id) : exitName(n.id);
 function placeTip(cx, cy) {
   const tw = tip.offsetWidth, th = tip.offsetHeight;
   let l = cx + 14; if (l + tw > innerWidth - 4) l = cx - tw - 14; l = clamp(l, 4, Math.max(4, innerWidth - tw - 4));
@@ -667,7 +743,7 @@ cvF.addEventListener('click', e => {
   const r = cvF.getBoundingClientRect(), h = hitFlow(e.clientX - r.left, e.clientY - r.top);
   if (h) { hover = h; computeRel(); tip.innerHTML = nodeTip(h); tip.classList.add('on'); placeTip(e.clientX, e.clientY); } else { hover = null; rel = null; tip.classList.remove('on'); }
   kick();
-  if (h && h.n && h.n.type === 'c' && (h.n.sess.size || expanded.has(h.n.id))) { if (expanded.has(h.n.id)) expanded.delete(h.n.id); else expanded.add(h.n.id); computeVer = -1; F.sig = ''; kick(); }
+  if (h && h.n && h.n.type === 'c' && (h.n.sess.size || expanded.has(h.n.id))) { const id = h.n.id; if (expanded.has(id)) { collapsed.add(id); opened.delete(id); expanded.delete(id); } else { opened.add(id); collapsed.delete(id); expanded.add(id); } computeVer = -1; F.sig = ''; kick(); }
 });
 
 /* ---------- timeline ---------- */
@@ -679,9 +755,13 @@ function buildLanes(t, win) {
   for (let i = lowerBound(L, win.start - 900000); i < L.length && L[i].t0 <= win.end; i++) {
     const r = L[i], e = r.t1 || t; if (e < win.start) continue;
     vis.push(r); const k = r.exit || 0; let ln = lanes.get(k);
-    if (!ln) lanes.set(k, ln = { key: k, rows: 1, spark: new Array(24).fill(0), n60: 0, t429: 0 });
-    ln.rows = Math.max(ln.rows, (r._row || 0) + 1);
+    if (!ln) lanes.set(k, ln = { key: k, rows: 1, spark: new Array(24).fill(0), n60: 0, t429: 0, last: 0 });
+    ln.rows = Math.max(ln.rows, (r._row || 0) + 1); ln.last = Math.max(ln.last, r.t0);
   }
+  /* sticky lanes: every exit with a request within max(range, active window) of now, plus anything in flight, stays listed (idle) even when the visible window is empty */
+  const mk = k => { let ln = lanes.get(k); if (!ln) lanes.set(k, ln = { key: k, rows: 1, spark: new Array(24).fill(0), n60: 0, t429: 0, last: 0 }); return ln; };
+  for (let i = lowerBound(L, t - Math.max(rangeMs, cfg.active_window_s * 1000)); i < L.length; i++) { const r = L[i], ln = mk(r.exit || 0); ln.last = Math.max(ln.last, r.t0); }
+  for (const id of inflight) { const r = recs.get(id); if (r) mk(r.exit || 0); }
   for (let i = lowerBound(L, t - 360000); i < L.length; i++) {
     const r = L[i], ln = lanes.get(r.exit || 0); if (!ln) continue;
     const age = t - r.t0, b = Math.floor(age / 15000); if (b >= 0 && b < 24) ln.spark[b]++; if (age < 60000) ln.n60++;
@@ -720,8 +800,8 @@ function drawTimeline(t) {
     X.strokeStyle = C.border; X.globalAlpha = .8; X.beginPath(); X.moveTo(0, ln.y + ln.h - .5); X.lineTo(W, ln.y + ln.h - .5); X.stroke(); X.globalAlpha = 1;
     X.globalAlpha = dim ? .5 : 1;
     const nm = ln.key ? exitName(ln.key) : '排队中 / 未分配';
-    if (narrow) { txt(nm, 8, ln.y + ln.h / 2 - 8, `600 11px ${SANS}`, C.text, LAB - 12); sparkline(ln, 8, ln.y + ln.h / 2 + 2, LAB - 16, 11); }
-    else { txt(nm, 12, ln.y + ln.h / 2 - 8, `600 12px ${SANS}`, C.text, LAB - 92); txt((ln.key ? '#' + (D.exits.get(ln.key) || {}).auth_index + ' · ' : '') + (ln.n60 ? ln.n60 + ' /分' : '空闲'), 12, ln.y + ln.h / 2 + 8, `11px ${SANS}`, C.muted, LAB - 92); sparkline(ln, LAB - 74, ln.y + ln.h / 2 - 9, 62, 18); }
+    if (narrow) { txt(nm, 8, ln.y + ln.h / 2 - 8, `600 11px ${SANS}`, C.text, LAB - 12); if (ln.spark.some(v => v)) sparkline(ln, 8, ln.y + ln.h / 2 + 2, LAB - 16, 11); else txt('空闲', 8, ln.y + ln.h / 2 + 8, `10px ${SANS}`, C.muted, LAB - 12); }
+    else { txt(nm, 12, ln.y + ln.h / 2 - 8, `600 12px ${SANS}`, C.text, LAB - 92); const idle = !ln.spark.some(v => v); txt(ln.n60 ? (ln.key ? '#' + (D.exits.get(ln.key) || {}).auth_index + ' · ' : '') + ln.n60 + ' /分' : '空闲' + (ln.last ? ' · 上次 ' + fmtClock(ln.last) : ''), 12, ln.y + ln.h / 2 + 8, `11px ${SANS}`, C.muted, idle ? LAB - 20 : LAB - 92); if (!idle) sparkline(ln, LAB - 74, ln.y + ln.h / 2 - 9, 62, 18); }
     X.globalAlpha = 1;
   });
   X.save(); X.beginPath(); X.rect(PL + 1, 0, W - PL, axisY); X.clip();
@@ -734,7 +814,7 @@ function drawTimeline(t) {
     const x0 = xOf(r.t0), x1 = xOf(Math.min(end, win.end + rangeMs)), w = Math.max(x1 - x0, 0);
     if (x1 < PL - 4 || x0 > PR + 4) continue;
     const failed = r.state === 'failed', canc = r.state === 'canceled' || r.state === 'rejected', lost = r.state === 'lost';
-    const col = failed ? C.err : lost ? C.faint : cliColor(r.client), h = 6 + 5 * Math.min(1, ((r.tok && r.tok.total) || 0) / 90000), a0 = hoverLane >= 0 && hoverLane !== li ? .35 : 1;
+    const col = failed ? C.err : lost ? C.faint : mdlColor(r.rule), h = 6 + 5 * Math.min(1, ((r.tok && r.tok.total) || 0) / 90000), a0 = hoverLane >= 0 && hoverLane !== li ? .35 : 1;
     if (w < 2.5 && !live) {
       const bx = clamp(Math.round(x0), 0, 4095), bk = row * 4096 + bx, tag = failed ? 2 : 1;
       if (bins[bk] >= tag) { hits.push({ r, x0: bx - 2, x1: bx + 3, y0: cy - ROW / 2, y1: cy + ROW / 2 }); continue; }
@@ -761,6 +841,7 @@ function drawTimeline(t) {
     X.globalAlpha = 1;
   }
   X.restore();
+  if (!vis.length) { const last = lanes.reduce((m, l) => Math.max(m, l.last), 0), ago = t - last, ag = ago < 60000 ? Math.max(1, Math.round(ago / 1000)) + ' 秒' : ago < 3600000 ? Math.round(ago / 60000) + ' 分钟' : Math.round(ago / 3600000) + ' 小时'; txt('区间内无请求' + (last ? ' · 上次请求 ' + ag + '前' : ''), (PL + PR) / 2, lanes[0].y + lanes[0].h / 2, `11px ${SANS}`, C.faint, PR - PL - 20, 'center'); }
   const gr = X.createLinearGradient(PL, 0, PL + 22, 0); gr.addColorStop(0, C.card); gr.addColorStop(1, rgba(C.card, 0)); X.fillStyle = gr; X.fillRect(PL + 1, TOPM - 4, 22, axisY - TOPM + 4);
   drawAxis(win, PL, PR, TOPM, axisY, xOf, t);
   if (oldestT && win.start < oldestT && !truncated) {
@@ -785,15 +866,16 @@ function sparkline(ln, sx0, sy0, w, h) {
   X.globalAlpha = ga;
 }
 function syncLegend(vis) {
-  const ids = new Set(); for (const r of vis) ids.add(r.client || 0);
-  const sig = [...ids].sort((a, b) => a - b).join(',') + '|' + D.clients.size;
+  /* one entry per upstream model in view; its tooltip lists the rule aliases that map to it */
+  const ms = new Map(); for (const r of vis) { const m = mdlOf(r.rule); if (!m) continue; let a = ms.get(m); if (!a) ms.set(m, a = { id: r.rule, al: new Set() }); a.al.add((D.rules.get(r.rule) || {}).alias); }
+  ms.forEach(v => mdlColor(v.id)); const ks = [...ms.keys()].sort((a, b) => mdlIdx.get(a) - mdlIdx.get(b)), sig = ks.join(',') + '|' + D.rules.size;
   if (sig === legendSig) return; legendSig = sig;
-  $('#legend').innerHTML = [...ids].sort((a, b) => a - b).map(id => `<span class="lg" title="${esc(cliName(id) + ' ' + cliSub(id))}"><i style="background:${cliColor(id)}"></i>${esc(cliName(id))}</span>`).join('');
+  $('#legend').innerHTML = ks.map(m => `<span class="lg" title="${esc(m + ' ← ' + [...ms.get(m).al].join(', '))}"><i style="background:${mdlColor(ms.get(m).id)}"></i>${esc(m)}</span>`).join('');
 }
 function recTip(r) {
   const cls = r.state === 'done' ? 'good' : r.state === 'failed' ? 'bad' : '', ss = D.sessions.get(r.session), par = ss && ss.parent && D.sessions.get(ss.parent), tk = r.tok;
-  let s = `<b><i style="background:${cliColor(r.client)}"></i>${esc(cliName(r.client))}</b>`;
-  s += trow('密钥 / IP', cliSub(r.client) || '—') + trow('会话', ss ? ss.short + (par ? ' ← ' + par.short : '') : '—') + trow('规则', ruleLabel(r.rule)) + trow('入口', exitName(r.exit) + (exitSub(r.exit) ? ' · ' + exitSub(r.exit) : ''));
+  let s = `<b><i style="background:${mdlColor(r.rule)}"></i>${esc(ruleLabel(r.rule))}</b>`;
+  s += trow('客户端', cliName(r.client)) + trow('密钥 / IP', cliSub(r.client) || '—') + trow('会话', ss ? ss.short + (par ? ' ← ' + par.short : '') : '—') + trow('入口', exitName(r.exit) + (exitSub(r.exit) ? ' · ' + exitSub(r.exit) : ''));
   s += trow('状态', stLabel(r) + (r.stream ? ' · stream' : ''), cls) + trow('开始', fmtClock(r.t0, true));
   if (r.ttft) s += trow('首字延迟', fmtSec(r.ttft));
   s += trow('总耗时', fmtSec(r.lat || ((r.t1 || now()) - r.t0)));
@@ -844,15 +926,18 @@ $('#bNow').onclick = () => { viewEnd = null; updateNowBtn(); kick(); };
 /* ---------- stats / chips / feed ---------- */
 let lastChip = 0, lastFeed = 0;
 function updateChips(t) {
-  const L = getList(), win = tlWindow(t); let n = 0, ok = 0, fail = 0, lat = 0, tok = 0;
+  const L = getList(), win = tlWindow(t); let n = 0, ok = 0, fail = 0, lat = 0, out = 0; const iv = [];
   for (let i = lowerBound(L, win.start - 900000); i < L.length && L[i].t0 <= win.end; i++) {
     const r = L[i]; if (r.t0 >= win.start) n++;
-    if (isTerm(r.state) && r.t1 && r.t1 >= win.start && r.t1 <= win.end) { if (r.state === 'done') { ok++; lat += r.lat || (r.t1 - r.t0); } else if (r.state === 'failed') fail++; if (r.tok) tok += r.tok.total || 0; }
+    if (isTerm(r.state) && r.t1 && r.t1 >= win.start && r.t1 <= win.end) { if (r.state === 'done') { ok++; lat += r.lat || (r.t1 - r.t0); } else if (r.state === 'failed') fail++; }
+    if (isTerm(r.state) && r.t1 && r.tok && r.tok.out) { const a0 = r.t0 + (r.ttft || 0), a = Math.max(a0, win.start), b = Math.min(r.t1, win.end); if (b > a && r.t1 > a0) { out += r.tok.out * (b - a) / (r.t1 - a0); iv.push([a, b]); } }
   }
+  iv.sort((x, y) => x[0] - y[0]); let busy = 0, ce = -Infinity; for (const [a, b] of iv) { if (a > ce) { busy += b - a; ce = b; } else if (b > ce) { busy += b - ce; ce = b; } }
+  const tps = out / (busy / 1000);
   $('#lReq').textContent = (viewEnd == null ? '近' + rangeLabel() : '窗口') + '请求';
   $('#cReq').textContent = n; $('#cInf').textContent = inflight.size;
   $('#cOk').textContent = ok + fail >= 3 ? (ok / (ok + fail) * 100).toFixed(1) + '%' : '—';
-  $('#cTps').textContent = tok / (rangeMs / 1000) >= 10 ? fmtK(tok / (rangeMs / 1000)) : (tok / (rangeMs / 1000)).toFixed(1);
+  $('#cTps').textContent = busy < 500 ? '—' : tps >= 10 ? fmtK(tps) : tps.toFixed(1);
   $('#cLat').textContent = ok >= 3 ? (lat / ok / 1000).toFixed(1) + 's' : '—';
   $('#rangeInfo').textContent = viewEnd == null ? rangeLabel() + ' · 跟随现在' : '回看 ' + fmtClock(win.start, true) + ' – ' + fmtClock(win.end, true);
 }
@@ -900,7 +985,7 @@ function render() {
     if (dataVer !== computeVer || t - lastCompute > 250 || !F.sig) computeFlow(t);
     nodeAnim = false; fadeFlag = false;
     for (const n of F.nodes.values()) {
-      if (n.alpha < 1) fadeFlag = true;
+      if (n.fading) fadeFlag = true;
       if (Math.abs(n.ty - n.y) > .4) { n.y += (n.ty - n.y) * K; nodeAnim = true; } else n.y = n.ty;
     }
     drawFlow(t);
@@ -1042,9 +1127,11 @@ function startDemo() {
   };
   const ROUTE = { 1: { 1: .6, 2: .4 }, 2: { 1: .4, 2: .4, 4: .2 }, 3: { 3: .8, 4: .2 }, 4: { 5: 1 }, 5: { 2: 1 } };
   const CLI = { 1: { w: .42, big: 1, rules: { 1: .3, 2: .6, 5: .1 }, sess: [1, 1, 2, 3, 4] }, 2: { w: .28, big: 1, rules: { 3: 1 }, sess: [5, 6] }, 3: { w: .14, rules: { 3: .5, 2: .3, 4: .2 }, sess: [7] }, 4: { w: .16, rules: { 2: .7, 4: .3 }, sess: [8] } };
+  /* demo-only knobs: &kids=N adds N sub-agents to session 1, &win=S shortens the active window (to see idle/cleanup sooner) */
+  for (let i = 0, nk = +P.get('kids') || 0; i < nk; i++) { DICT.sessions.push({ id: 9 + i, sid: 'claude:7b1e2c4d:agent:task-' + i, short: 'task-' + i, parent: 1, client: 1 }); CLI[1].sess.push(9 + i); }
   const wpick = o => { const e = Object.entries(o), tt = e.reduce((s, x) => s + x[1], 0); let r = Math.random() * tt; for (const [k, w] of e) if ((r -= w) <= 0) return +k; return +e[0][0]; };
   let seq = 0; const quiet = +P.get('quiet') || 0, t00 = Date.now();
-  mergeDict(DICT); cfg = Object.assign({}, DEF_CFG); netState = 'ok'; setPill();
+  mergeDict(DICT); cfg = Object.assign({}, DEF_CFG); if (+P.get('win') > 0) cfg.active_window_s = +P.get('win'); netState = 'ok'; setPill();
   const build = (cid, t0) => {
     const c = CLI[cid], rule = wpick(c.rules), exit = wpick(ROUTE[rule]), r = Math.random(), canc = r < .03, fail = !canc && r < .1;
     const inT = c.big ? Math.round(2e4 + Math.pow(Math.random(), 1.4) * 1e5) : Math.round(500 + Math.random() * 2.5e4), outT = Math.round(200 + Math.pow(Math.random(), 2) * 3800);
@@ -1080,7 +1167,7 @@ function startDemo() {
 }
 
 /* ---------- boot ---------- */
-Object.defineProperty(window, '__lr', { value: Object.freeze({ get records() { return recs.size; }, get inflight() { return inflight.size; }, get rafCount() { return rafCount; }, get flights() { return flights.size; }, get layout() { return effLayout(); }, get nodes() { return F.nodes.size; }, get sessions() { return F.lists.s.length; }, get panned() { return viewEnd != null; },
+Object.defineProperty(window, '__lr', { value: Object.freeze({ get records() { return recs.size; }, get inflight() { return inflight.size; }, get rafCount() { return rafCount; }, get flights() { return flights.size; }, get layout() { return effLayout(); }, get nodes() { return F.nodes.size; }, get sessions() { return F.lists.s.length; }, get expanded() { return [...expanded]; }, get panned() { return viewEnd != null; },
   get geom() { const nb = n => ({ k: n.key, x: n.x, y: n.y - n.h / 2, w: n.w, h: n.h, gm: n.gm == null ? 16 : n.gm }); return { W, FH, nodes: [...F.lists.c, ...F.lists.s, ...F.lists.x].map(nb), edges: [...F.edges.values()].filter(e => e.w / .3 >= .02).map(e => ({ a: e.a, b: e.b, segs: [edgeG(e)] })) }; },
   get firstClient() { const n = F.lists.c[0]; if (!n) return null; const r = cvF.getBoundingClientRect(); return { x: r.left + n.x + n.w / 2, y: r.top + n.y }; } }) });
 (function boot() {

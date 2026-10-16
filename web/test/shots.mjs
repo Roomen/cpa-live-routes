@@ -216,11 +216,11 @@ async function expandedLinkChecks(browser, origin) {
     await h.page.goto(origin + '/v0/resource/plugins/live-routes/live?demo=1');
     await h.page.waitForFunction(() => window.__lr.nodes > 5, null, { timeout: 8000 });
     await sleep(800);
-    // expand every client that has sessions, one at a time (positions move after each click)
+    // clients with open sessions are expanded by default; click any that is still collapsed, one at a time (positions move after each click)
     for (let i = 0; i < 6; i++) {
-      const pts = await h.page.evaluate(() => { const r = document.querySelector('#cvF').getBoundingClientRect(); return window.__lr.geom.nodes.filter(n => n.k[0] === 'c').map(n => ({ x: r.left + n.x + n.w / 2, y: r.top + n.y + n.h / 2 })); });
+      const pts = await h.page.evaluate(() => { const r = document.querySelector('#cvF').getBoundingClientRect(), ex = window.__lr.expanded; return window.__lr.geom.nodes.filter(n => n.k[0] === 'c').map(n => ({ x: r.left + n.x + n.w / 2, y: r.top + n.y + n.h / 2, ex: ex.includes(+n.k.slice(1)) })); });
       if (i >= pts.length) break;
-      await h.page.mouse.click(pts[i].x, pts[i].y); await sleep(700);
+      if (!pts[i].ex) { await h.page.mouse.click(pts[i].x, pts[i].y); await sleep(700); }
     }
     await h.page.mouse.move(2, 2); await sleep(1500);
     const g = await h.page.evaluate(() => window.__lr.geom), hits = linksUnderNodes(g);
@@ -281,12 +281,17 @@ async function interactions(browser, origin) {
   await openLive(h, origin + '/v0/resource/plugins/live-routes/live');
   await h.page.waitForFunction(() => window.__lr.records > 0 && window.__lr.nodes > 0, null, { timeout: 8000 });
   await sleep(800);
+  // open sessions show without a click; clicking a client collapses it, clicking again expands it
   const before = await h.page.evaluate(() => window.__lr.sessions);
-  const fc = await h.page.evaluate(() => window.__lr.firstClient);
+  let fc = await h.page.evaluate(() => window.__lr.firstClient);
+  await h.page.mouse.click(fc.x, fc.y);
+  await sleep(900);
+  const mid = await h.page.evaluate(() => window.__lr.sessions);
+  fc = await h.page.evaluate(() => window.__lr.firstClient);
   await h.page.mouse.click(fc.x, fc.y);
   await sleep(500);
   const after = await h.page.evaluate(() => window.__lr.sessions);
-  check(before === 0 && after > 0, `interact: click client expands sessions (${before} -> ${after})`);
+  check(before > 0 && mid < before && after > mid, `interact: sessions shown by default, click client collapses / expands (${before} -> ${mid} -> ${after})`);
   await sleep(1500);
   const eh = linksUnderNodes(await h.page.evaluate(() => window.__lr.geom));
   check(eh.length === 0, `interact: expanded links clear of unrelated nodes${eh.length ? ' (' + eh.slice(0, 4).join(', ') + ')' : ''}`);
