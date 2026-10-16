@@ -66,10 +66,10 @@ async function storageAudit(h, label) {
   const r = await h.page.evaluate(async () => {
     const keys = Object.keys(localStorage);
     let dbs = 0; try { dbs = indexedDB.databases ? (await indexedDB.databases()).length : 0; } catch (e) {}
-    return { keys, session: Object.keys(sessionStorage).filter(k => k !== '__init').length, cookie: document.cookie, idb: window.__idb, dbs, href: location.href };
+    return { keys, session: Object.keys(sessionStorage).filter(k => k !== '__init' && k !== 'lr-key').length, cookie: document.cookie, idb: window.__idb, dbs, href: location.href };
   });
   check(r.keys.every(k => ALLOWED.has(k)), `${label}: localStorage keys ⊆ allowed (${r.keys.join(',') || 'key'})`);
-  check(r.session === 0 && r.cookie === '' && r.idb === 0 && r.dbs === 0, `${label}: no sessionStorage/cookie/IndexedDB`);
+  check(r.session === 0 && r.cookie === '' && r.idb === 0 && r.dbs === 0, `${label}: no sessionStorage (except the tab key)/cookie/IndexedDB`);
   return r;
 }
 function endChecks(h, label) {
@@ -127,9 +127,10 @@ async function authKey(browser) {
   await sleep(2500);
   const a = await h.page.evaluate(() => {
     const dump = []; for (let i = 0; i < localStorage.length; i++) dump.push(localStorage.key(i) + '=' + localStorage.getItem(localStorage.key(i)));
-    return { dump: dump.join(';'), href: location.href, cookie: document.cookie, ss: Object.keys(sessionStorage).length, html: document.documentElement.outerHTML.includes('test-key') };
+    return { dump: dump.join(';'), href: location.href, cookie: document.cookie, ss: Object.keys(sessionStorage), tabKey: sessionStorage.getItem('lr-key'), html: document.documentElement.outerHTML.includes('test-key') };
   });
-  check(!a.dump.includes('test-key') && !a.href.includes('test-key') && !a.cookie.includes('test-key') && a.ss === 0, 'auth=key: key never in localStorage/URL/cookie/sessionStorage');
+  check(!a.dump.includes('test-key') && !a.href.includes('test-key') && !a.cookie.includes('test-key'), 'auth=key: without "remember" the key is not in localStorage/URL/cookie');
+  check(a.ss.join() === 'lr-key' && a.tabKey === 'test-key', 'auth=key: key kept only in this tab\'s sessionStorage');
   check(!a.html, 'auth=key: key string not left in the DOM');
   await storageAudit(h, 'auth=key');
   const noTokenInUrl = h.reqs.every(r => !r.includes('tok-') && !r.includes('test-key'));
@@ -153,6 +154,7 @@ async function authKey(browser) {
   });
   await h.page.waitForSelector('#gKeyBox:not([hidden])', { timeout: 10000 });
   check(revoked && await h.page.inputValue('#gKey') === '', 'auth=key: a later 401 clears key and asks for reauthentication');
+  check(await h.page.evaluate(() => sessionStorage.getItem('lr-key') === null && localStorage.getItem('lr-key') === null), 'auth=key: a later 401 drops the cached key');
   const pausedAt = h.dataReqs.length; await sleep(1400);
   check(h.dataReqs.length === pausedAt, 'auth=key: polling stops until key is reentered');
   await h.page.unroute('**/v0/management/live-routes/events?*');
@@ -164,8 +166,35 @@ async function authKey(browser) {
   check(await h.page.isHidden('#gate'), 'auth=key: delayed 401 from old history request cannot clear the new login');
   const beforeReload = h.dataReqs.length;
   await h.page.reload();
+  await h.page.waitForFunction(() => window.__lr.records > 0, null, { timeout: 8000 });
+  check(await h.page.isHidden('#gate') && h.dataReqs.slice(beforeReload).every(r => r.auth === 'Bearer test-key'), 'auth=key: reload reuses the tab key without the form');
+  const other = await h.ctx.newPage(); await other.goto(origin + '/v0/resource/plugins/live-routes/live');
+  await other.waitForSelector('#gKeyBox:not([hidden])', { timeout: 5000 });
+  check(true, 'auth=key: without "remember" a new tab asks for the key');
+  await other.close();
+  await h.page.click('#bOut');
   await h.page.waitForSelector('#gKeyBox:not([hidden])');
-  check(await h.page.inputValue('#gKey') === '' && h.dataReqs.length === beforeReload, 'auth=key: reload starts without saved credentials or data requests');
+  const afterOut = h.dataReqs.length; await sleep(1400);
+  check(h.dataReqs.length === afterOut && await h.page.evaluate(() => sessionStorage.getItem('lr-key') === null), 'auth=key: logout clears the key and stops polling');
+  check(await h.page.evaluate(() => window.__lr.records === 0 && window.__lr.inflight === 0), 'auth=key: logout drops the loaded records');
+  let heldSnap; await h.page.route('**/v0/management/live-routes/snapshot', route => { heldSnap = route; });
+  await h.page.fill('#gKey', 'any-key'); await h.page.click('#gGo');
+  await h.page.waitForFunction(() => document.querySelector('#gate').hidden, null, { timeout: 4000 }); await sleep(600);
+  const pend = await h.page.evaluate(() => ({ recs: window.__lr.records, log: document.querySelector('#list').children.length }));
+  check(!!heldSnap && pend.recs === 0 && pend.log === 0, 'auth=key: after logout, old records stay hidden while a new key is being checked');
+  await h.page.unroute('**/v0/management/live-routes/snapshot');
+  await heldSnap.fulfill({ status: 401, contentType: 'application/json', body: '{"error":"invalid management key"}' });
+  await h.page.waitForSelector('#gKeyBox:not([hidden])');
+  await h.page.fill('#gKey', 'test-key'); await h.page.check('#gRemember'); await h.page.click('#gGo');
+  await h.page.waitForFunction(() => window.__lr.records > 0, null, { timeout: 8000 });
+  check(await h.page.evaluate(() => localStorage.getItem('lr-key') === 'test-key'), 'auth=key: "remember" stores the key in localStorage');
+  const tab2 = await h.ctx.newPage(); await tab2.goto(origin + '/v0/resource/plugins/live-routes/live');
+  await tab2.waitForFunction(() => window.__lr.records > 0, null, { timeout: 8000 });
+  check(await tab2.isHidden('#gate'), 'auth=key: a remembered key opens new tabs without the form');
+  await tab2.route('**/v0/management/live-routes/events?*', route => route.fulfill({ status: 401, contentType: 'application/json', body: '{"error":"invalid management key"}' }));
+  await tab2.waitForSelector('#gKeyBox:not([hidden])', { timeout: 10000 });
+  check(await tab2.evaluate(() => localStorage.getItem('lr-key') === null), 'auth=key: a 401 drops the remembered key');
+  await tab2.close();
 
   h.errs = h.errs.filter(e => !e.includes('status of 401')); // the browser logs the expected 401 responses of the auth flow
   endChecks(h, 'auth=key');

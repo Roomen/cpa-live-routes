@@ -85,7 +85,7 @@ Expand-Archive $zip -DestinationPath plugins\windows\amd64 -Force   # live-route
 | 现象 | 原因 / 处理 |
 | --- | --- |
 | 数据接口返回 `403 remote management key not set` | CPA 尚未配置管理密钥。在 CPA 的 `config.yaml` 中设置 `remote-management.secret-key`，或在 CPA 进程环境中设置 `MANAGEMENT_PASSWORD`，然后重试。 |
-| 数据接口返回 401，或 `403` 提示 IP 被封禁 | 输入已配置的 CPA 管理密钥。同一 IP 连续输错 5 次会被封禁 30 分钟；封禁期间该 IP 的请求返回 403，等待封禁结束后重试。远程访问还需启用 CPA 远程管理。密钥仅保存在页面内存中，刷新后需重新输入。 |
+| 数据接口返回 401，或 `403` 提示 IP 被封禁 | 输入已配置的 CPA 管理密钥。同一 IP 连续输错 5 次会被封禁 30 分钟；封禁期间该 IP 的请求返回 403，等待封禁结束后重试。远程访问还需启用 CPA 远程管理。密钥失效（401）时页面会清除已缓存的密钥并要求重新输入。 |
 | 没有"排队/路由中"状态，客户端显示未知 | `inflight_tracking` 为 `false`，只展示已完成请求的用量记录。 |
 | 看不到客户端 IP | CPA 不把客户端地址传给插件，只有在反向代理设置了 `X-Forwarded-For` / `X-Real-IP` 时才显示。 |
 | 数据消失了 | CPA 或插件重启过，或数据超出了 `retention_minutes` / `max_records`。数据只存在内存里，这是设计行为。 |
@@ -131,7 +131,7 @@ plugins:
 - `GET /v0/management/live-routes/events`
 - `GET /v0/management/live-routes/records`
 
-请在 CPA 的 `config.yaml` 中设置 `remote-management.secret-key`，或在 CPA 进程环境中设置 `MANAGEMENT_PASSWORD`，以启用管理鉴权。两者都未设置时，数据请求返回 `403 remote management key not set`。每次数据请求都必须在 bearer 形式的 `Authorization` 头中携带有效的 CPA 管理密钥，由 CPA 执行管理鉴权；本机回环访问也不例外。页面只在内存中持有输入的密钥，不写入浏览器持久存储，刷新后需重新输入。脚本也使用同样的 bearer 头。通过域名或反向代理访问时，还需启用 CPA 远程管理。
+请在 CPA 的 `config.yaml` 中设置 `remote-management.secret-key`，或在 CPA 进程环境中设置 `MANAGEMENT_PASSWORD`，以启用管理鉴权。两者都未设置时，数据请求返回 `403 remote management key not set`。每次数据请求都必须在 bearer 形式的 `Authorization` 头中携带有效的 CPA 管理密钥，由 CPA 执行管理鉴权；本机回环访问也不例外。页面默认把输入的密钥保存在当前标签页的 `sessionStorage`（`lr-key`）中，刷新无需重输，关闭标签页即清除；勾选「在此浏览器记住密钥」后还会明文保存在 `localStorage`（`lr-key`）中，新标签页和重启浏览器后也无需重输，仅建议在个人设备上使用。收到 401/403 或点击「退出」时两处都会清除。脚本也使用同样的 bearer 头。通过域名或反向代理访问时，还需启用 CPA 远程管理。
 
 迁移说明：旧资源数据接口 `/v0/resource/plugins/live-routes/api/{snapshot,events,records}` 返回 404，旧配置 `require_key` 会被忽略。
 
@@ -146,7 +146,7 @@ plugins:
 
 ## 存储保证
 
-仅使用内存。插件不会向磁盘写入任何内容，CPA 或插件重启后数据即清空。页面只在浏览器 `localStorage` 中保存界面偏好（`lr-view`、`lr-layout`、`lr-speed`、`lr-range`）。
+仅使用内存。插件不会向磁盘写入任何内容，CPA 或插件重启后数据即清空。页面在浏览器 `localStorage` 中保存界面偏好（`lr-view`、`lr-layout`、`lr-speed`、`lr-range`），以及用户勾选「记住密钥」时的管理密钥（`lr-key`）。
 
 `scripts/e2e/run.sh` 会在真实 CPA 进程上对比启用与停用插件时打开的常规文件，以验证这一点。
 

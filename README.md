@@ -85,7 +85,7 @@ To update, replace the library file and restart CPA. To uninstall, set `plugins.
 | Symptom | Cause / fix |
 | --- | --- |
 | Data returns `403 remote management key not set` | CPA has no management key configured. Set `remote-management.secret-key` in CPA's `config.yaml`, or set `MANAGEMENT_PASSWORD` in CPA's environment, then retry. |
-| Data returns 401, or `403` says the IP is banned | Enter the configured CPA management key. Five failed key attempts from the same IP trigger a 30-minute ban; requests from that IP return 403 until the ban expires. Remote access also requires CPA remote management to be enabled. The page keeps the key in memory only, so enter it again after a reload. |
+| Data returns 401, or `403` says the IP is banned | Enter the configured CPA management key. Five failed key attempts from the same IP trigger a 30-minute ban; requests from that IP return 403 until the ban expires. Remote access also requires CPA remote management to be enabled. When the key stops working (401), the page drops the cached key and asks for it again. |
 | No "queued / routing" state, client shows as unknown | `inflight_tracking` is `false`, so only completed requests (usage records) are shown. |
 | Client IP is missing | CPA does not pass the client address to plugins. It is shown only behind a reverse proxy that sets `X-Forwarded-For` / `X-Real-IP`. |
 | Data disappeared | CPA or the plugin restarted, or the data aged out of `retention_minutes` / `max_records`. Data is memory-only by design. |
@@ -131,7 +131,7 @@ The static page is served at `GET /v0/resource/plugins/live-routes/live` and car
 - `GET /v0/management/live-routes/events`
 - `GET /v0/management/live-routes/records`
 
-Configure CPA management authentication with `remote-management.secret-key` in `config.yaml` or `MANAGEMENT_PASSWORD` in CPA's environment. If neither is set, data requests return `403 remote management key not set`. Every data request must send a valid CPA management key in a bearer `Authorization` header and pass CPA management authentication, including requests over loopback. The page holds the entered key in memory only, never in persistent browser storage; a reload requires entering it again. Scripts use the same bearer header. Access through a domain or reverse proxy also requires CPA remote management to be enabled.
+Configure CPA management authentication with `remote-management.secret-key` in `config.yaml` or `MANAGEMENT_PASSWORD` in CPA's environment. If neither is set, data requests return `403 remote management key not set`. Every data request must send a valid CPA management key in a bearer `Authorization` header and pass CPA management authentication, including requests over loopback. By default the page keeps the entered key in this tab's `sessionStorage` (`lr-key`), so a reload does not ask again and closing the tab clears it. Ticking "在此浏览器记住密钥" (remember the key in this browser) also stores it in plain text in `localStorage` (`lr-key`), so new tabs and browser restarts do not ask again; use this only on a personal device. A 401/403 response or the 退出 (log out) button clears both copies. Scripts use the same bearer header. Access through a domain or reverse proxy also requires CPA remote management to be enabled.
 
 For migration, the old resource data routes `/v0/resource/plugins/live-routes/api/{snapshot,events,records}` return 404, and legacy `require_key` is ignored.
 
@@ -146,7 +146,7 @@ Client API keys are redacted inside the plugin: only a mask such as `sk-...3f9a`
 
 ## Storage guarantee
 
-Memory only. The plugin writes nothing to disk, and all data is cleared when CPA or the plugin restarts. The page uses browser `localStorage` only for UI preferences (`lr-view`, `lr-layout`, `lr-speed`, `lr-range`).
+Memory only. The plugin writes nothing to disk, and all data is cleared when CPA or the plugin restarts. The page uses browser `localStorage` for UI preferences (`lr-view`, `lr-layout`, `lr-speed`, `lr-range`) and, when the viewer opts in to remembering it, the management key (`lr-key`).
 
 `scripts/e2e/run.sh` verifies this against a real CPA process by comparing its open regular files with and without the plugin.
 
