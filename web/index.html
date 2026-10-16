@@ -121,8 +121,9 @@ h1{font-size:18px;margin:0;font-weight:650;letter-spacing:.01em}
 .gate h2{margin:0 0 8px;font-size:16px}
 .gate p{margin:6px 0;color:var(--text-quaternary);line-height:1.6}
 .gate .fr{display:flex;gap:8px;justify-content:center;margin-top:14px;flex-wrap:wrap}
-.gate input{font:inherit;font-size:13px;color:var(--text-primary);background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:8px;padding:6px 10px;min-width:220px;max-width:100%}
+.gate input[type=password]{font:inherit;font-size:13px;color:var(--text-primary);background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:8px;padding:6px 10px;min-width:220px;max-width:100%}
 .gate .bad{color:var(--error)}
+.gate .rem{display:flex;gap:6px;align-items:center;justify-content:center;margin-top:10px;font-size:12px;color:var(--text-quaternary);cursor:pointer}
 @media (max-width:900px){
   .main{grid-template-columns:minmax(0,1fr)}
   .feed{contain:none;min-height:0}
@@ -153,6 +154,7 @@ h1{font-size:18px;margin:0;font-weight:650;letter-spacing:.01em}
         <button data-l="tabs" aria-pressed="true">标签页</button><button data-l="split" aria-pressed="false">分栏</button>
       </div>
       <button class="btn" id="bCfg" aria-pressed="false" aria-controls="cfgp">配置</button>
+      <button class="btn" id="bOut" hidden>退出</button>
     </div>
   </div>
   <section class="panel cfgp" id="cfgp" hidden>
@@ -172,8 +174,9 @@ h1{font-size:18px;margin:0;font-weight:650;letter-spacing:.01em}
     <div id="gForb" hidden><h2>无法访问</h2><p>CPA 管理接口拒绝访问。请先在 CPA 配置管理密钥（remote-management.secret-key 或环境变量 MANAGEMENT_PASSWORD），本机访问也需要配置。其他可能原因包括远程管理访问设置不允许，或失败次数过多被暂时封禁：同一 IP 连续 5 次认证失败会被封禁 30 分钟。请检查配置，或等待封禁到期后重试。</p><button class="btn" id="gRetry">重新输入管理密钥</button></div>
     <div id="gKeyBox" hidden>
       <h2>需要管理密钥</h2>
-      <p>每次数据请求均使用 CPA 管理密钥验证。密钥仅保留在本页内存中，刷新或关闭页面后需重新输入。</p>
+      <p>每次数据请求均使用 CPA 管理密钥验证。密钥默认只保存在当前标签页，刷新无需重输，关闭标签页即清除。勾选「在此浏览器记住密钥」会把密钥明文保存在本浏览器中，仅建议在个人设备上使用。密钥失效或点击「退出」时自动清除。</p>
       <div class="fr"><input id="gKey" type="password" autocomplete="off" spellcheck="false" aria-label="管理密钥" placeholder="管理密钥"><button class="btn" id="gGo">验证</button></div>
+      <label class="rem"><input type="checkbox" id="gRemember">在此浏览器记住密钥</label>
       <p class="bad" id="gErr"></p>
     </div>
   </section>
@@ -212,6 +215,7 @@ const P = new URLSearchParams(location.search);
 const DEMO = P.get('demo') === '1';
 const LSget = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 const LSset = (k, v) => { try { localStorage.setItem(k, String(v)); } catch (e) { } };
+const LSdel = k => { try { localStorage.removeItem(k); } catch (e) { } };
 
 /* ---------- preferences / config ---------- */
 const DEF_CFG = { active_window_s: 600, retention_s: 1800, max_records: 5000, animation_speed: '1x', reduced_animation: false, inflight_tracking: true, layout: 'tabs' };
@@ -1027,12 +1031,20 @@ function showGate(kind) {
   gated = kind; clearTimeout(pollTm);
   $('#gate').hidden = false; $('#main').hidden = true; document.querySelector('.chips').hidden = true;
   $('#gForb').hidden = kind !== 'forbidden'; $('#gKeyBox').hidden = kind !== 'key';
-  setPill(); if (kind === 'key') $('#gKey').focus();
+  $('#bOut').hidden = true; setPill(); if (kind === 'key') $('#gKey').focus();
 }
-function hideGate() { gated = null; $('#gate').hidden = true; $('#main').hidden = false; document.querySelector('.chips').hidden = false; $('#gErr').textContent = ''; }
+function hideGate() { gated = null; $('#bOut').hidden = DEMO; $('#gate').hidden = true; $('#main').hidden = false; document.querySelector('.chips').hidden = false; $('#gErr').textContent = ''; }
 
 /* ---------- live data adapter ---------- */
 const API = new URL('/v0/management/live-routes/', location.origin);
+/* The key lives in this tab's sessionStorage, and in localStorage only when the viewer opts in.
+   Both copies are dropped on 401/403 and on logout. */
+const KEY = 'lr-key';
+function loadKey() { try { const k = sessionStorage.getItem(KEY); if (k) return k; } catch (e) { } return LSget(KEY) || null; }
+function saveKey(k, remember) { try { sessionStorage.setItem(KEY, k); } catch (e) { } if (remember) LSset(KEY, k); else LSdel(KEY); }
+function forgetKey() { try { sessionStorage.removeItem(KEY); } catch (e) { } LSdel(KEY); }
+// Losing authorization also drops the loaded data: the next key must earn a fresh snapshot before anything shows again.
+function dropAuth() { authGen++; managementKey = null; forgetKey(); cursor = null; GROUPS.forEach(g => D[g].clear()); resetData(); histGen++; F.sig = ''; kick(); }
 let managementKey = null, authGen = 0, cursor = null, histNext = null, histGen = 0, backoff = 0, pollTm = 0, lastEv = 0, polling = false, fetchingOlder = false;
 async function call(path, params) {
   const u = new URL(path, API); for (const k in params || {}) u.searchParams.set(k, params[k]);
@@ -1076,8 +1088,8 @@ async function applyEvents(ev) {
 }
 function handleErr(e) {
   if (e.staleAuth) { if (managementKey && !gated) pollNow(); return; }
-  if (e.status === 403) { authGen++; managementKey = null; cursor = null; showGate('forbidden'); return; }
-  if (e.status === 401) { authGen++; const hadKey = managementKey != null; managementKey = null; cursor = null; showGate('key'); if (hadKey) $('#gErr').textContent = '管理密钥无效或已失效，请重新输入'; return; }
+  if (e.status === 403) { dropAuth(); showGate('forbidden'); return; }
+  if (e.status === 401) { const hadKey = managementKey != null; dropAuth(); showGate('key'); if (hadKey) $('#gErr').textContent = '管理密钥无效或已失效，请重新输入'; return; }
   netState = 'retry'; setPill(); backoff = Math.min(10000, backoff ? backoff * 2 : 1000);
   clearTimeout(pollTm); pollTm = setTimeout(pollNow, backoff);
 }
@@ -1107,10 +1119,12 @@ async function fetchOlder() {
 }
 function login() {
   const inp = $('#gKey'); managementKey = inp.value; inp.value = ''; if (!managementKey) { managementKey = null; return; }
+  saveKey(managementKey, $('#gRemember').checked);
   authGen++; hideGate(); netState = 'connecting'; setPill(); cursor = null; pollNow();
 }
 $('#gRetry').onclick = () => { $('#gErr').textContent = ''; showGate('key'); };
 $('#gGo').onclick = login;
+$('#bOut').onclick = () => { dropAuth(); $('#gErr').textContent = ''; netState = 'connecting'; showGate('key'); };
 $('#gKey').addEventListener('keydown', e => { if (e.key === 'Enter') login(); });
 
 /* ---------- demo mode (offline simulated contract data) ---------- */
@@ -1173,6 +1187,7 @@ Object.defineProperty(window, '__lr', { value: Object.freeze({ get records() { r
 (function boot() {
   readColors(); W = Math.max(280, $('#mainp').clientWidth || 800); dpr = Math.min(2, window.devicePixelRatio || 1);
   if (DEMO) { startDemo(); kick(); return; }
+  managementKey = loadKey(); if (managementKey) $('#bOut').hidden = false;
   setPill(); kick();
   pollNow();
 })();

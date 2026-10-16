@@ -1,10 +1,9 @@
 name: release
 
 on:
+  # Only release tags build. Tag runs restore caches from their own ref and main only, so after a Go
+  # version or scripts/darwin-amd64-go.sh change, run workflow_dispatch on main once to warm the toolchain cache.
   push:
-    # main builds and tests only; it also saves the darwin/amd64 toolchain cache that tag runs restore.
-    branches:
-      - main
     tags:
       - "v*"
   workflow_dispatch:
