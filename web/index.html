@@ -190,7 +190,7 @@ h1{font-size:18px;margin:0;font-weight:650;letter-spacing:.01em}
         <button class="btn" id="bNow" hidden>回到现在</button>
         <div class="legend" id="legend" aria-label="模型图例"></div>
       </div>
-      <div class="box" id="boxF"><canvas id="cvF" aria-label="入口（OAuth / API）、CPA 规则、harness / 客户端、会话流向"></canvas></div>
+      <div class="box" id="boxF"><canvas id="cvF" aria-label="入口（OAuth / API）、CPA 模型、harness / 客户端、会话流向"></canvas></div>
       <div class="box" id="boxT"><canvas id="cvT" aria-label="按入口分道的请求时间线"></canvas></div>
     </div>
     <div class="panel feed"><h2>最近请求<span id="feedN"></span></h2><ul id="list"></ul></div>
@@ -445,6 +445,13 @@ function computeFlow(t) {
 
 /* flow layout */
 const ruleLines = (r, stack) => !r || r.alias === r.model ? [r ? r.alias : '?'] : stack ? [r.alias, '→ ' + r.model] : [r.alias + ' → ' + r.model];
+const modelCount = rl => new Set(rl.map(n => D.rules.get(n.id)?.model).filter(Boolean)).size;
+function hubHeading(ctx, small, split, rl) {
+  const titleFont = `700 ${split ? 12 : small ? 13 : 15}px ${SANS}`, countFont = `${small ? 9.5 : 11}px ${SANS}`, label = modelCount(rl) + ' 个模型';
+  ctx.font = titleFont; const titleWidth = ctx.measureText('CPA').width;
+  ctx.font = countFont;
+  return { titleFont, countFont, label, minWidth: Math.ceil(titleWidth + 12 + ctx.measureText(label).width + (small ? 20 : 36)) };
+}
 function layoutFlow() {
   const split = effLayout() === 'split', small = W < 560, stack = !split && W < 760, ls = F.lists;
   G = split ? { top: small ? 24 : 28, bot: 8, nh: small ? 36 : 38, gap: 5, rh: small ? 17 : 19, hdr: small ? 22 : 26, foot: 0, pad: small ? 6 : 12, gx: small ? 14 : 36, max: 250, min: 80 }
@@ -453,6 +460,8 @@ function layoutFlow() {
   const rl = ls.r.map(n => D.rules.get(n.id));
   let tw = 70; rl.forEach(r => ruleLines(r, stack).forEach(s => { tw = Math.max(tw, X.measureText(s).width); }));
   hub.w = Math.ceil(tw + (small ? 22 : 36)); if (mini()) hub.w = Math.min(hub.w, 104);
+  // Font metrics vary by platform; reserve both header labels even for a short model name.
+  hub.w = Math.max(hub.w, hubHeading(X, small, split, ls.r).minWidth);
   const nR = Math.max(1, ls.r.length), hasS = ls.s.length > 0, cols = hasS ? 4 : 3;
   const avail = W - 2 * G.pad - hub.w - G.gx * (cols - 1);
   let cw = clamp(avail * (hasS ? .3 : mini() ? .5 : .42), small ? 90 : 110, 190), sw = hasS ? clamp(avail * .2, small ? 62 : 90, 130) : 0, xw = clamp(avail * (hasS ? .3 : mini() ? .5 : .52), small ? 90 : 130, 230);
@@ -609,8 +618,9 @@ function drawHub() {
   X.save(); rr(x, y, w, h, 14); X.clip(); X.fillStyle = C.ter; X.fillRect(x, y, w, hub.hdr - 4); X.restore();
   X.lineWidth = 1.5; X.strokeStyle = C.accent; rr(x + .75, y + .75, w - 1.5, h - 1.5, 14); X.stroke();
   const px = x + (small ? 10 : 18), iw = w - (small ? 20 : 36), th = (hub.hdr - 4) / 2 + 1;
-  txt('CPA', px, y + th, `700 ${split ? 12 : small ? 13 : 15}px ${SANS}`, C.text);
-  txt(rl.length + ' 条规则', px + iw, y + th, `${small ? 9.5 : 11}px ${SANS}`, C.muted, 0, 'right');
+  const heading = hubHeading(X, small, split, rl);
+  txt('CPA', px, y + th, heading.titleFont, C.text);
+  txt(heading.label, px + iw, y + th, heading.countFont, C.muted, 0, 'right');
   rl.forEach(n => {
     const r = D.rules.get(n.id), ty = n.ry - (hub.rh - 3) / 2, dm = (rel ? (rel.N.has(n.key) ? 1 : .35) : 1) * clamp(n.alpha, .2, 1), lines = ruleLines(r, stack);
     const fnt = `${small ? 9 : stack ? 10.5 : 11}px ${MONO}`; X.globalAlpha = dm;
@@ -626,7 +636,7 @@ function drawHub() {
 function drawChrome() {
   const split = effLayout() === 'split', small = W < 560, y = split ? 13 : small ? 20 : 26, f = `600 ${small || split ? 10.5 : 12}px ${SANS}`, ls = F.lists;
   txt('入口 · OAuth / API · ' + ls.x.length, G.pad + 2, y, f, C.muted);
-  txt('CPA 规则', hub.x + hub.w / 2, y, f, C.muted, 0, 'center');
+  txt('CPA 模型', hub.x + hub.w / 2, y, f, C.muted, 0, 'center');
   if (ls.s.length) { txt('harness / 客户端 · ' + ls.c.length, ls.c[0].x + 2, y, f, C.muted); txt('会话 · ' + ls.s.length, W - G.pad - 2, y, f, C.muted, 0, 'right'); }
   else txt('harness / 客户端 · ' + ls.c.length, W - G.pad - 2, y, f, C.muted, 0, 'right');
   if (split) return;
@@ -715,7 +725,7 @@ const trow = (a, b, c) => `<div><span>${esc(a)}</span><span class="mono ${c || '
 const rangeLabel = () => rangeMs === 30000 ? '30秒' : rangeMs === 120000 ? '2分钟' : '10分钟';
 function nodeTip(h) {
   if (h.e) { const e = h.e, na = F.nodes.get(e.a), nb = F.nodes.get(e.b); return `<b>${esc(nodeTitle(na))} → ${esc(nodeTitle(nb))}</b>` + trow('近 60 秒速率权重', e.w.toFixed(1)) + trow('失败权重', e.ew.toFixed(1)); }
-  if (h.k === 'hub') return '<b>CPA</b>' + trow('规则数', F.lists.r.length);
+  if (h.k === 'hub') return '<b>CPA</b>' + trow('模型数', modelCount(F.lists.r));
   const n = h.n, rate = n.ok + n.fail >= 1 ? (n.ok / (n.ok + n.fail) * 100).toFixed(1) + '%' : '—';
   let s = `<b>${esc(nodeTitle(n))}</b>`;
   if (n.type === 'c') { const c = D.clients.get(n.id); s += trow('harness', c ? c.kind : '—') + trow('密钥 / IP', cliSub(n.id) || '—') + trow('会话数', n.sess.size) + (n.sess.size ? trow('', expanded.has(n.id) ? '点击收起会话' : '点击展开会话') : ''); }
