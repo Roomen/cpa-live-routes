@@ -1,0 +1,9 @@
+Generator: built-in image_gen
+Transparent background: true
+
+Use case: logo-brand
+Asset type: production transparent app icon for Live Routes, a CLIProxyAPI real-time routing dashboard plugin, shown in EasyCLIProxyAPI sidebar at 20–24px.
+Primary request: Design one exceptionally crisp, restrained geometric symbol combining a branching request route and a live pulse. A single incoming horizontal route from the left divides into two paths to upper-right and lower-right, with a subtle short heartbeat-like angular rise incorporated in the central route. Three solid round endpoint nodes, bold uniform rounded strokes, balanced compact silhouette, generous gaps that remain legible at 20 pixels. Make the route itself the entire logo.
+Style: minimal flat vector-like developer-tool identity, precise geometry, polished professional utility, no lettering. Single solid teal color #159E98, consistent opaque color across the icon, no gradient. Centered in a square canvas with approximately 12 percent clear padding on every side.
+Background: true transparent alpha, no solid canvas, no card or enclosing tile.
+Constraints: one standalone symbol only, no presentation board, no duplicates, no caption, no watermark, no shadows, no glow, no 3D, no fine detail, no detached decorations. Optimized for both light and dark sidebars.
