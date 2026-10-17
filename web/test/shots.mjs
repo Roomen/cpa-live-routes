@@ -370,10 +370,53 @@ async function evictAndReset(browser, origin) {
   await h.ctx.close();
 }
 
+async function hubHeadingChecks(browser, origin) {
+  for (const aliases of [false, true]) for (const mode of ['tabs', 'split', 'phone']) {
+    const label = `hub/${aliases ? 'shared-model' : 'single-model'}/${mode}`;
+    const h = await newPage(browser, origin, { viewport: mode === 'phone' ? { width: 390, height: 844 } : { width: 1280, height: 800 }, scheme: 'dark', dsf: mode === 'split' ? 1.25 : 2, ls: mode === 'split' ? { 'lr-layout': 'split' } : {} }, label);
+    await h.ctx.addInitScript(() => {
+      window.__hubText = {};
+      const draw = CanvasRenderingContext2D.prototype.fillText;
+      CanvasRenderingContext2D.prototype.fillText = function (s, x, y, ...rest) {
+        if (this.canvas.id === 'cvF' && (s === 'CPA' || /^\d+ (个模型|条规则)$/.test(s))) {
+          const m = this.measureText(s), left = x - (this.textAlign === 'right' ? m.width : 0);
+          window.__hubText[s === 'CPA' ? 'title' : 'count'] = { text: s, left, right: left + m.width, y };
+        }
+        return draw.call(this, s, x, y, ...rest);
+      };
+    });
+    await h.page.route('**/v0/management/live-routes/**', async route => {
+      const response = await route.fetch(), data = await response.json();
+      if (data.dict?.rules) data.dict.rules = aliases
+        ? data.dict.rules.map(r => ({ ...r, alias: 'a' + r.id, model: 'm' }))
+        : [{ id: 1, alias: 'gpt-6-astra', model: 'gpt-6-astra' }];
+      if (!aliases) {
+        for (const r of data.records || []) r.rule = 1;
+        for (const e of data.events || []) if (e.rec) e.rec.rule = 1;
+      }
+      await route.fulfill({ response, json: data });
+    });
+    await openLive(h, origin + '/v0/resource/plugins/live-routes/live');
+    await h.page.waitForFunction(() => window.__hubText.count && window.__lr.nodes > 0);
+    const text = await h.page.evaluate(() => window.__hubText);
+    check(text.count.text === '1 个模型', `${label}: counts unique upstream models`);
+    check(text.title.y === text.count.y && text.count.left - text.title.right >= 11, `${label}: header labels have at least 11px clearance`);
+    const cv = await h.page.locator('#cvF').boundingBox();
+    await h.page.mouse.move(cv.x + text.title.left + 4, cv.y + text.title.y);
+    await h.page.waitForFunction(() => document.querySelector('#tip').textContent.includes('模型数'));
+    check((await h.page.locator('#tip').innerText()).includes('模型数'), `${label}: tooltip uses model wording`);
+    await h.page.mouse.move(0, 0);
+    await h.page.screenshot({ path: path.join(OUT, `hub-${aliases ? 'shared' : 'single'}-${mode}.png`), fullPage: true });
+    endChecks(h, label);
+    await h.ctx.close();
+  }
+}
+
 const browser = await chromium.launch();
 try {
   if (process.argv.includes('--auth-only')) { await authKey(browser); await authForbidden(browser); } else {
   const origin = await startMock(18417, 'key');
+  await hubHeadingChecks(browser, origin);
   const files = [];
   const jobs = [];
   for (const src of ['mock', 'demo']) {
