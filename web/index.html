@@ -204,6 +204,10 @@ h1{font-size:18px;margin:0;font-weight:650;letter-spacing:.01em}
 <script>
 (() => {
 'use strict';
+const t = (...args) => window.t(...args);
+const setLang = (...args) => window.setLang(...args);
+const applyI18n = (...args) => window.applyI18n(...args);
+const getCurrentLang = () => window.currentLang;
 const $ = s => document.querySelector(s);
 const SANS = 'ui-sans-serif,system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif';
 const MONO = 'ui-monospace,SFMono-Regular,Menlo,Consolas,monospace';
@@ -1036,7 +1040,7 @@ function render() {
 let chipVer = -1;
 
 /* ---------- controls ---------- */
-$('#segLang').onclick = e => { const b = e.target.closest('button'); if (!b) return; setLang(b.dataset.lang); for (const btn of $('#segLang').querySelectorAll('button')) btn.setAttribute('aria-pressed', btn.dataset.lang === currentLang); };
+$('#segLang').onclick = e => { const b = e.target.closest('button'); if (!b) return; setLang(b.dataset.lang); for (const btn of $('#segLang').querySelectorAll('button')) btn.setAttribute('aria-pressed', btn.dataset.lang === getCurrentLang()); };
 $('#bPause').onclick = e => { paused = !paused; e.currentTarget.setAttribute('aria-pressed', paused); e.currentTarget.textContent = t(paused ? 'resume' : 'pause'); if (paused) { flights.clear(); fx.length = 0; } setPill(); kick(); };
 $('#segSpeed').onclick = e => { const b = e.target.closest('button'); if (!b) return; speedOv = b.dataset.s; LSset('lr-speed', speedOv); kick(); };
 $('#segRange').onclick = e => { const b = e.target.closest('button'); if (!b) return; rangeMs = +b.dataset.r; LSset('lr-range', rangeMs); legendSig = ''; computeVer = -1; chipVer = -1; kick(); };
@@ -1216,7 +1220,7 @@ Object.defineProperty(window, '__lr', { value: Object.freeze({ get records() { r
   get firstClient() { const n = F.lists.c[0]; if (!n) return null; const r = cvF.getBoundingClientRect(); return { x: r.left + n.x + n.w / 2, y: r.top + n.y }; } }) });
 (function boot() {
   readColors(); W = Math.max(280, $('#mainp').clientWidth || 800); dpr = Math.min(2, window.devicePixelRatio || 1);
-  applyI18n(); for (const btn of $('#segLang').querySelectorAll('button')) btn.setAttribute('aria-pressed', btn.dataset.lang === currentLang);
+  applyI18n(); for (const btn of $('#segLang').querySelectorAll('button')) btn.setAttribute('aria-pressed', btn.dataset.lang === getCurrentLang());
   if (DEMO) { startDemo(); kick(); return; }
   managementKey = loadKey(); if (managementKey) $('#bOut').hidden = false;
   setPill(); kick();

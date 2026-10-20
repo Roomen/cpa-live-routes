@@ -144,7 +144,14 @@ const I18N = {
     // Demo data
     workMachine: 'Estação de trabalho',
     devMachine: 'Máquina de desenvolvimento',
-  },
+    demo: 'Demo',
+    CPA: 'CPA',
+    error: 'Erro',
+    button: 'Botão',
+    kids: 'Filhos',
+    quiet: 'Silencioso',
+    win: 'Janela',
+    },
   'en': {
     pageTitle: 'Live Routes',
     liveRoutes: 'Live Routes',
@@ -272,8 +279,15 @@ const I18N = {
     
     workMachine: 'Workstation',
     devMachine: 'Dev machine',
-  },
-  'zh-cn': {
+    demo: 'Demo',
+    CPA: 'CPA',
+    error: 'Error',
+    button: 'Button',
+    kids: 'Children',
+    quiet: 'Quiet',
+    win: 'Window',
+    },
+    'zh-cn': {
     pageTitle: 'Live Routes',
     liveRoutes: '实时链路',
     connecting: '连接中',
@@ -400,6 +414,13 @@ const I18N = {
     
     workMachine: '工作机',
     devMachine: '开发机',
+    demo: '演示',
+    CPA: 'CPA',
+    error: '错误',
+    button: '按钮',
+    kids: '子级',
+    quiet: '静默',
+    win: '窗口',
   }
 };
 
