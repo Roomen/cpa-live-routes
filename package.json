@@ -3,7 +3,9 @@
   "private": true,
   "scripts": {
     "test": "node --test web/test/geometry.test.cjs",
-    "test:browser": "node --test web/test/browser.test.cjs"
+    "test:browser": "node --test web/test/browser.test.cjs",
+    "test:i18n": "node web/test/i18n.test.mjs",
+    "test:regression": "node web/test/shots.mjs"
   },
   "devDependencies": { "playwright": "1.61.1" }
 }

@@ -13,8 +13,9 @@ const fixture = require('./fixture.cjs');
     res.setHeader('Content-Type','text/html; charset=utf-8');res.end(html.replace('(function boot() {',fixture+'\n(function boot() {').replace('startDemo(); kick(); return;',"window.__test.load(); kick(); return;"));
   });
   await new Promise(r=>server.listen(0,'127.0.0.1',r));
-  const browser=await chromium.launch({...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH?{executablePath:process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH}:{})});
+  let browser;
   try {
+    browser=await chromium.launch({...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH?{executablePath:process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH}:{})});
     const page=await browser.newPage({viewport:{width:1280,height:900},colorScheme:'light'});
     await page.addInitScript(()=>{Date.now=()=>1792548000000;});
     for(const name of Object.keys(sources)) {
@@ -24,5 +25,5 @@ const fixture = require('./fixture.cjs');
       await page.waitForTimeout(1000);
       await page.screenshot({path:path.join(out,`${name}.png`),fullPage:true});
     }
-  } finally {await browser.close(); await new Promise(r=>server.close(r));}
+  } finally {if (browser) await browser.close(); await new Promise(r=>server.close(r));}
 })().catch(e=>{console.error(e);process.exitCode=1;});

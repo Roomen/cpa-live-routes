@@ -14,17 +14,19 @@ test('offline browser matrix: directions, session trees, layouts, widths and the
   const served = html.replace('(function boot() {',fixture+'\n(function boot() {').replace('startDemo(); kick(); return;',"window.__test.load(); kick(); return;");
   const server = http.createServer((req,res)=>{res.setHeader('Content-Type','text/html; charset=utf-8');res.end(req.url.startsWith('/demo?')?html:served);});
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
-  const browser = await chromium.launch({...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH?{executablePath:process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH}:{})});
-  const context = await browser.newContext();
+  let browser;
+  try {
+  browser = await chromium.launch({...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH?{executablePath:process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH}:{})});
+  const context = await browser.newContext({ locale: 'zh-CN' });
   const page = await context.newPage();
   const errors=[], external=[];
   page.on('pageerror',e=>errors.push(e.message));
+  page.on('console',m=>{if(m.type()==='error') errors.push(m.text());});
   await page.route('**/*',route=>{if(new URL(route.request().url()).hostname!=='127.0.0.1'){external.push(route.request().url());return route.abort();}return route.continue();});
   const url = `http://127.0.0.1:${server.address().port}/?demo=1`;
   const snapshot = () => page.evaluate(()=>window.__test.inspect());
   const direction = async d => {await page.locator(`[data-d="${d}"]`).click();await page.waitForFunction(d=>document.querySelector(`[data-d="${d}"]`).getAttribute('aria-pressed')==='true',d);};
   let cases=0;
-  try {
     await page.setViewportSize({width:1280,height:900});await page.goto(url);
     await page.waitForFunction(()=>window.__lr?.nodes>0);
     assert.equal((await snapshot()).direction,'rtl','fresh browser preserves upstream default');
@@ -94,8 +96,8 @@ test('offline browser matrix: directions, session trees, layouts, widths and the
     await page.reload();await page.waitForFunction(()=>window.__lr?.nodes>0);
     assert.equal((await snapshot()).direction,'ltr');assert.equal((await snapshot()).layout,'split');
     assert.equal(await page.evaluate(()=>localStorage.getItem('lr-range')),'30000');
-    for(const [lang,label] of [['en','Left-to-right'],['pt-BR','esquerda'],['zh-CN','从左到右']]) {
-      await page.evaluate(lang=>document.documentElement.lang=lang,lang);
+    for(const [lang,label] of [['en','Left-to-right'],['pt-br','esquerda'],['zh-cn','从左到右']]) {
+      await page.locator(`#segLang button[data-lang="${lang}"]`).click();
       await page.waitForFunction(label=>document.querySelector('#cvF').getAttribute('aria-label').includes(label),label);
     }
     // Unrecognized and inaccessible storage both retain RTL without breaking rendering.
@@ -108,5 +110,5 @@ test('offline browser matrix: directions, session trees, layouts, widths and the
     assert.deepEqual(errors,[]);assert.deepEqual(external,[]);
     fs.writeFileSync(path.join(output,'results.json'),JSON.stringify({matrixCases:cases,errors,external,checks:['pointer collapse/expand','queued/routed/success/failure flights survive switch','continuous paths','timeline state and pixel equality','reload preferences','language labels','invalid/blocked storage']},null,2));
     console.log(`${cases} matrix cases plus interaction, animation, persistence and timeline checks passed`);
-  } finally {await browser.close();await new Promise(resolve=>server.close(resolve));}
+  } finally {if (browser) await browser.close();await new Promise(resolve=>server.close(resolve));}
 });

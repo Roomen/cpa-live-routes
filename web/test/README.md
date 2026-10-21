@@ -7,6 +7,8 @@ npm ci
 npm test
 npx playwright install chromium
 npm run test:browser
+PLAYWRIGHT_MODULE="$PWD/node_modules/playwright" npm run test:i18n
+PLAYWRIGHT_MODULE="$PWD/node_modules/playwright" npm run test:regression
 ```
 
 `npm test` runs the production path functions in a Node VM. It checks every
@@ -25,7 +27,10 @@ collapsed, absent, child sessions and folded children), two layout preferences,
 two viewport widths and two themes. Below 900px split intentionally falls back
 to tabs. Other checks cover actual canvas clicks, flight state transitions,
 preserving flights during direction changes, unchanged timeline pixels/state,
-reload persistence, language-sensitive accessibility labels and blocked storage.
+reload persistence, language-sensitive accessibility labels and blocked storage. The i18n suite adds
+54 initial-language/language/direction/view combinations under the production CSP.
+The regression suite retains the existing authentication, history, idle and layout
+checks. Browser startup failures close their test servers before exiting.
 Split mode retains upstream's static flow behavior; it does not enable flights.
 
 To use an existing Chromium installation, set
