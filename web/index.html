@@ -153,6 +153,9 @@ h1{font-size:18px;margin:0;font-weight:650;letter-spacing:.01em}
       <div class="seg" id="segLayout" role="group" aria-label="布局">
         <button data-l="tabs" aria-pressed="true">标签页</button><button data-l="split" aria-pressed="false">分栏</button>
       </div>
+      <div class="seg" id="segDirection" role="group" aria-label="流向">
+        <button data-d="rtl" aria-pressed="true" aria-label="从右到左（默认）" title="从右到左（默认）">←</button><button data-d="ltr" aria-pressed="false" aria-label="从左到右（客户端在左）" title="从左到右（客户端在左）">→</button>
+      </div>
       <button class="btn" id="bCfg" aria-pressed="false" aria-controls="cfgp">配置</button>
       <button class="btn" id="bOut" hidden>退出</button>
     </div>
@@ -190,7 +193,7 @@ h1{font-size:18px;margin:0;font-weight:650;letter-spacing:.01em}
         <button class="btn" id="bNow" hidden>回到现在</button>
         <div class="legend" id="legend" aria-label="模型图例"></div>
       </div>
-      <div class="box" id="boxF"><canvas id="cvF" aria-label="入口（OAuth / API）、CPA 模型、harness / 客户端、会话流向"></canvas></div>
+      <div class="box" id="boxF"><canvas id="cvF" aria-label="从右到左的请求展示：会话（展开时）、客户端、CPA 模型、OAuth / API 凭证"></canvas></div>
       <div class="box" id="boxT"><canvas id="cvT" aria-label="按入口分道的请求时间线"></canvas></div>
     </div>
     <div class="panel feed"><h2>最近请求<span id="feedN"></span></h2><ul id="list"></ul></div>
@@ -223,6 +226,9 @@ let cfg = Object.assign({}, DEF_CFG);
 let rangeMs = +LSget('lr-range'); if (![30000, 120000, 600000].includes(rangeMs)) rangeMs = 120000;
 let speedOv = LSget('lr-speed'); if (!['0.5', '1', '2'].includes(speedOv)) speedOv = null;
 let layoutOv = LSget('lr-layout'); if (layoutOv !== 'tabs' && layoutOv !== 'split') layoutOv = null;
+// A browser-only presentation preference, independent of tabs/split and CPA config.
+let flowDirection = LSget('lr-flow-direction') === 'ltr' ? 'ltr' : 'rtl';
+const leftToRight = () => flowDirection === 'ltr';
 let view = LSget('lr-view') === 'time' ? 'time' : 'flow';
 let paused = false, viewEnd = null;
 const RMq = matchMedia('(prefers-reduced-motion: reduce)');
@@ -248,7 +254,7 @@ const rgba = (c, a) => { const x = rgbOf(c); return `rgba(${x[0]},${x[1]},${x[2]
 const mix = (a, b, t) => { const x = rgbOf(a), y = rgbOf(b); return `rgb(${x.map((v, i) => Math.round(v + (y[i] - v) * t)).join(',')})`; };
 readColors();
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { readColors(); kick(); });
-new MutationObserver(() => { readColors(); kick(); }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+new MutationObserver(() => { readColors(); updateDirectionLabel(); kick(); }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme', 'lang'] });
 
 /* ---------- data store ---------- */
 const GROUPS = ['clients', 'keys', 'sessions', 'rules', 'exits'];
@@ -348,8 +354,9 @@ let hub = { x: 0, y: 0, w: 0, h: 0, ry0: 0, rh: 28, hdr: 40, foot: 24 };
 let lastCompute = 0, computeVer = -1, nodeAnim = false, hover = null, rel = null, G = null, relSig = '', sKey = new Map();
 /* the host never reports a closed session: last activity is now while a request is in flight, else its newest t1||t0; sub-agents close after KID_MS idle, roots after rootTtl() */
 const rootTtl = () => Math.max(cfg.active_window_s * 1000, Math.min(1800000, cfg.retention_s * 1000));
-/* a request starts at its open session's row (when its client is expanded), then client, rule and exit */
-const pathKeys = r => { const c = r.client || 0, sk = r.session && expanded.has(c) && sKey.get(r.session), k = sk ? [sk, 'c' + c] : ['c' + c]; k.push('r' + (r.rule || 0)); if (r.exit) k.push('x' + r.exit); return k; };
+/* Sessions are visual groupings, not network hops. Keep the original RTL order;
+   LTR groups a client's expanded sessions between its card and the CPA model. */
+const pathKeys = r => { const c = r.client || 0, sk = r.session && expanded.has(c) && sKey.get(r.session), k = sk ? (leftToRight() ? ['c' + c, sk] : [sk, 'c' + c]) : ['c' + c]; k.push('r' + (r.rule || 0)); if (r.exit) k.push('x' + r.exit); return k; };
 
 function computeFlow(t) {
   const winMs = cfg.active_window_s * 1000, rg = rangeMs, L = getList(), H = rootTtl();
@@ -477,7 +484,7 @@ function layoutFlow() {
   const room = W - 2 * G.pad - hub.w - 6 * (cols - 1), sum = cw + sw + xw;
   if (sum > room) { const f = Math.max(0, room) / sum; cw *= f; sw *= f; xw *= f; }
   const gapX = Math.max(6, (W - 2 * G.pad - cw - sw - xw - hub.w) / (cols - 1));
-  /* one band per client: the client centred in it, its expanded sessions stacked to its right, so a client's
+  /* one band per client: the client centred in it, its expanded sessions stacked beside it, so a client's
      session links stay inside its own band and never pass behind another client's sessions */
   const cPos = new Map(ls.c.map((n, i) => [n.id, i])), bands = ls.c.map(n => ({ c: n, ss: [] })), orphan = { c: null, ss: [] };
   for (const n of ls.s) (cPos.has(n.cli) ? bands[cPos.get(n.cli)] : orphan).ss.push(n);
@@ -489,8 +496,10 @@ function layoutFlow() {
   const availH = FH - G.top - G.bot;
   if (hubNat > availH) rh = Math.max(12, (availH - G.hdr - G.foot) / nR);
   hub.rh = rh; hub.hdr = G.hdr; hub.foot = G.foot; hub.h = G.hdr + nR * rh + G.foot; hub.y = G.top + (mini() ? 0 : Math.max(0, (availH - hub.h) / 2)); hub.ry0 = hub.y + G.hdr;
-  /* exits on the left, then CPA, clients, and the sessions of expanded clients on the far right */
-  let x = G.pad; const xx = x; x += xw + gapX; hub.x = x; x += hub.w + gapX; const cx = x; x += cw + (hasS ? gapX : 0); const sx = x;
+  /* Place whole columns; ports, hit regions and labels use these same coordinates. */
+  let x = G.pad, xx, cx, sx;
+  if (leftToRight()) { cx = x; x += cw + gapX; sx = x; if (hasS) x += sw + gapX; hub.x = x; x += hub.w + gapX; xx = x; }
+  else { xx = x; x += xw + gapX; hub.x = x; x += hub.w + gapX; cx = x; x += cw + (hasS ? gapX : 0); sx = x; }
   const grid = c => { const step = Math.min(step0 * (fill ? 1.5 : 1), availH / c); return { step, h: Math.min(G.nh, step - G.gap * .6), y0: G.top + (mini() ? 0 : (availH - step * c) / 2) + step / 2 }; };
   const put = (n, ty, left, w, g) => { n.ty = ty; n.x = left; n.w = w; n.h = g.h; n.gm = Math.max(0, Math.min(16, (g.step - g.h) / 2 - 1, left - 1, W - left - w - 1)); if (n.fresh) n.y = n.ty; };
   const gx = grid(Math.max(1, ls.x.length));
@@ -506,9 +515,9 @@ function layoutFlow() {
   }
   ls.r.forEach((n, i) => { n.ry = hub.ry0 + i * rh + (rh - 3) / 2; n.y = n.ry; n.ty = n.ry; });
 }
-/* requests travel right to left: they leave a node on its left edge and enter the next on its right edge */
-const portOut = n => n.type === 'r' ? { x: hub.x, y: n.ry } : { x: n.x, y: n.y };
-const portIn = n => n.type === 'r' ? { x: hub.x + hub.w, y: n.ry } : { x: n.x + n.w, y: n.y };
+/* Request ports follow the selected display direction; responses retrace the path. */
+const portOut = n => n.type === 'r' ? { x: hub.x + (leftToRight() ? hub.w : 0), y: n.ry } : { x: n.x + (leftToRight() ? n.w : 0), y: n.y };
+const portIn = n => n.type === 'r' ? { x: hub.x + (leftToRight() ? 0 : hub.w), y: n.ry } : { x: n.x + (leftToRight() ? 0 : n.w), y: n.y };
 const bzg = (a, b) => { const d = (b.x - a.x) * .5; return [a, { x: a.x + d, y: a.y }, { x: b.x - d, y: b.y }, b]; };
 const bezAt = (g, u) => { const m = 1 - u; return { x: m * m * m * g[0].x + 3 * m * m * u * g[1].x + 3 * m * u * u * g[2].x + u * u * u * g[3].x, y: m * m * m * g[0].y + 3 * m * m * u * g[1].y + 3 * m * u * u * g[2].y + u * u * u * g[3].y }; };
 const edgeG = e => bzg(portOut(F.nodes.get(e.a)), portIn(F.nodes.get(e.b)));
@@ -521,12 +530,12 @@ function buildPath(r) {
     const na = F.nodes.get(keys[i]), nb = F.nodes.get(keys[i + 1]); if (!na || !nb) return null;
     const p0 = portOut(na), p3 = portIn(nb); segs.push(bzg(p0, p3));
     if (nb.type === 'r') { const o = portOut(nb); segs.push([p3, p3, o, o]); hubIdx = segs.length - 1; }
-    else if (nb.type === 'c' && i + 2 < keys.length) { const o = portOut(nb); segs.push([p3, p3, o, o]); } /* pass straight through a client card to its left port */
+    else if (i + 2 < keys.length) { const o = portOut(nb); segs.push([p3, p3, o, o]); } /* cross every intermediate card, including LTR sessions */
   }
   if (hubIdx < 1 || !segs.length) return null;
   return { segs, hf: (hubIdx + .5) / segs.length, qi: hubIdx - 1 };
 }
-/* resting spot: exactly on the port where the link meets the card (rule row's right port while queued, exit card's right edge once routed);
+/* resting spot: exactly on the incoming port (rule row while queued, exit card once routed);
    k > 0 spreads extra waiting requests ALONG the link just outside the port, 7px apart, so they never leave the line */
 function restS(pth, k, routed) {
   const m = pth.segs.length, si = routed ? m - 1 : pth.qi, sg = pth.segs[si], du = Math.min(.3, k * 7 / (1.5 * Math.max(40, Math.abs(sg[3].x - sg[0].x))));
@@ -643,10 +652,14 @@ function drawHub() {
 }
 function drawChrome() {
   const split = effLayout() === 'split', small = W < 560, y = split ? 13 : small ? 20 : 26, f = `600 ${small || split ? 10.5 : 12}px ${SANS}`, ls = F.lists;
-  txt('入口 · OAuth / API · ' + ls.x.length, G.pad + 2, y, f, C.muted);
-  txt('CPA 模型', hub.x + hub.w / 2, y, f, C.muted, 0, 'center');
-  if (ls.s.length) { txt('harness / 客户端 · ' + ls.c.length, ls.c[0].x + 2, y, f, C.muted); txt('会话 · ' + ls.s.length, W - G.pad - 2, y, f, C.muted, 0, 'right'); }
-  else txt('harness / 客户端 · ' + ls.c.length, W - G.pad - 2, y, f, C.muted, 0, 'right');
+  const ltr = leftToRight();
+  // Keep headings inside their columns, including four-column phone layouts.
+  const xw = ls.x[0] ? ls.x[0].w - 4 : 100, cw = ls.c[0] ? ls.c[0].w - 4 : 100;
+  const clientLabel = (small ? '客户端 · ' : 'harness / 客户端 · ') + ls.c.length;
+  txt((small ? '凭证 · ' : '入口 · OAuth / API · ') + ls.x.length, ltr ? W - G.pad - 2 : G.pad + 2, y, f, C.muted, xw, ltr ? 'right' : 'left');
+  txt('CPA 模型', hub.x + hub.w / 2, y, f, C.muted, hub.w - 4, 'center');
+  if (ls.s.length) { txt(clientLabel, ls.c[0].x + 2, y, f, C.muted, cw); txt('会话 · ' + ls.s.length, ltr ? ls.s[0].x + 2 : W - G.pad - 2, y, f, C.muted, ls.s[0].w - 4, ltr ? 'left' : 'right'); }
+  else txt(clientLabel, ltr ? G.pad + 2 : W - G.pad - 2, y, f, C.muted, cw, ltr ? 'left' : 'right');
   if (split) return;
   const ly = FH - 16, lf = `${small ? 9.5 : 11}px ${SANS}`; let lx = small ? 8 : 16;
   for (const [c, t] of [[C.ok, '成功'], [C.err, '失败'], [C.info, '进行中']]) { X.fillStyle = c; X.beginPath(); X.arc(lx + 3, ly, 3, 0, 7); X.fill(); txt(t, lx + 10, ly, lf, C.faint); X.font = lf; lx += 10 + X.measureText(t).width + 12; }
@@ -1025,6 +1038,7 @@ function render() {
   $('#segView').hidden = el === 'split';
   $('#legend').hidden = !tv;
   for (const b of document.querySelectorAll('#segLayout button')) b.setAttribute('aria-pressed', b.dataset.l === el);
+  for (const b of document.querySelectorAll('#segDirection button')) b.setAttribute('aria-pressed', b.dataset.d === flowDirection);
   for (const b of document.querySelectorAll('#segView button')) b.setAttribute('aria-pressed', b.dataset.v === view);
   for (const b of document.querySelectorAll('#segSpeed button')) b.setAttribute('aria-pressed', +b.dataset.s === speedVal());
   for (const b of document.querySelectorAll('#segRange button')) b.setAttribute('aria-pressed', +b.dataset.r === rangeMs);
@@ -1036,6 +1050,24 @@ $('#bPause').onclick = e => { paused = !paused; e.currentTarget.setAttribute('ar
 $('#segSpeed').onclick = e => { const b = e.target.closest('button'); if (!b) return; speedOv = b.dataset.s; LSset('lr-speed', speedOv); kick(); };
 $('#segRange').onclick = e => { const b = e.target.closest('button'); if (!b) return; rangeMs = +b.dataset.r; LSset('lr-range', rangeMs); legendSig = ''; computeVer = -1; chipVer = -1; kick(); };
 $('#segLayout').onclick = e => { const b = e.target.closest('button'); if (!b) return; layoutOv = b.dataset.l; LSset('lr-layout', layoutOv); F.sig = ''; flights.clear(); kick(); };
+function updateDirectionLabel() {
+  // Follow the document language (also changed by the language selector in PR #12).
+  // Keep these new strings together so they can move into its shared dictionary.
+  const lang = document.documentElement.lang.toLowerCase();
+  const labels = lang.startsWith('zh') ? ['流向', '从右到左（默认）', '从左到右（客户端在左）', '从右到左的请求展示：会话（展开时）、客户端、CPA 模型、OAuth / API 凭证', '从左到右的请求展示：客户端、会话（展开时）、CPA 模型、OAuth / API 凭证']
+    : lang.startsWith('pt') ? ['Direção do fluxo', 'Da direita para a esquerda (padrão)', 'Da esquerda para a direita (cliente à esquerda)', 'Exibição de solicitações da direita para a esquerda: sessão (expandida), cliente, modelo CPA, credencial OAuth / API', 'Exibição de solicitações da esquerda para a direita: cliente, sessão (expandida), modelo CPA, credencial OAuth / API']
+    : ['Flow direction', 'Right to left (default)', 'Left to right (client on the left)', 'Right-to-left request display: session (when expanded), client, CPA model, OAuth / API credential', 'Left-to-right request display: client, session (when expanded), CPA model, OAuth / API credential'];
+  $('#segDirection').setAttribute('aria-label', labels[0]);
+  for (const b of document.querySelectorAll('#segDirection button')) { const label = labels[b.dataset.d === 'rtl' ? 1 : 2]; b.setAttribute('aria-label', label); b.title = label; }
+  cvF.setAttribute('aria-label', labels[leftToRight() ? 4 : 3]);
+}
+$('#segDirection').onclick = e => {
+  const b = e.target.closest('button'); if (!b || b.dataset.d === flowDirection) return;
+  flowDirection = b.dataset.d; LSset('lr-flow-direction', flowDirection);
+  // Rebuild path membership as well as geometry; retain in-flight animation progress.
+  F.sig = ''; computeVer = -1; hover = null; rel = null; relSig = ''; tip.classList.remove('on');
+  updateDirectionLabel(); kick();
+};
 $('#segView').onclick = e => { const b = e.target.closest('button'); if (!b) return; view = b.dataset.v; LSset('lr-view', view); tip.classList.remove('on'); hover = null; rel = null; hoverRec = null; F.sig = ''; kick(); };
 new ResizeObserver(() => { F.sig = ''; kick(); }).observe($('#mainp'));
 addEventListener('resize', () => { F.sig = ''; kick(); });
@@ -1210,6 +1242,7 @@ Object.defineProperty(window, '__lr', { value: Object.freeze({ get records() { r
   get geom() { const nb = n => ({ k: n.key, x: n.x, y: n.y - n.h / 2, w: n.w, h: n.h, gm: n.gm == null ? 16 : n.gm }); return { W, FH, nodes: [...F.lists.c, ...F.lists.s, ...F.lists.x].map(nb), edges: [...F.edges.values()].filter(e => e.w / .3 >= .02).map(e => ({ a: e.a, b: e.b, segs: [edgeG(e)] })) }; },
   get firstClient() { const n = F.lists.c[0]; if (!n) return null; const r = cvF.getBoundingClientRect(); return { x: r.left + n.x + n.w / 2, y: r.top + n.y }; } }) });
 (function boot() {
+  updateDirectionLabel();
   readColors(); W = Math.max(280, $('#mainp').clientWidth || 800); dpr = Math.min(2, window.devicePixelRatio || 1);
   if (DEMO) { startDemo(); kick(); return; }
   managementKey = loadKey(); if (managementKey) $('#bOut').hidden = false;

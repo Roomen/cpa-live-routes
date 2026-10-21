@@ -1,0 +1,9 @@
+{
+  "name": "cpa-live-routes-ui-tests",
+  "private": true,
+  "scripts": {
+    "test": "node --test web/test/geometry.test.cjs",
+    "test:browser": "node --test web/test/browser.test.cjs"
+  },
+  "devDependencies": { "playwright": "1.61.1" }
+}
