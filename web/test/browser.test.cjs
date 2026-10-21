@@ -12,7 +12,7 @@ test('offline browser matrix: directions, session trees, layouts, widths and the
   const html = fs.readFileSync(path.join(__dirname,'../index.html'),'utf8');
   assert.ok(html.includes('(function boot() {'), 'fixture injection anchor');
   const served = html.replace('(function boot() {',fixture+'\n(function boot() {').replace('startDemo(); kick(); return;',"window.__test.load(); kick(); return;");
-  const server = http.createServer((req,res)=>{res.setHeader('Content-Type','text/html; charset=utf-8');res.end(served);});
+  const server = http.createServer((req,res)=>{res.setHeader('Content-Type','text/html; charset=utf-8');res.end(req.url.startsWith('/demo?')?html:served);});
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
   const browser = await chromium.launch({...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH?{executablePath:process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH}:{})});
   const context = await browser.newContext();
@@ -101,7 +101,10 @@ test('offline browser matrix: directions, session trees, layouts, widths and the
     // Unrecognized and inaccessible storage both retain RTL without breaking rendering.
     await page.evaluate(()=>localStorage.setItem('lr-flow-direction','invalid'));await page.reload();await page.waitForFunction(()=>window.__lr?.nodes>0);assert.equal((await snapshot()).direction,'rtl');
     await page.addInitScript(()=>{Storage.prototype.getItem=()=>{throw new Error('blocked');};Storage.prototype.setItem=()=>{throw new Error('blocked');};});
-    await page.reload();await page.waitForFunction(()=>window.__lr?.nodes>0);await direction('ltr');
+    await page.reload();await page.waitForFunction(()=>window.__lr?.nodes>0);assert.equal((await snapshot()).direction,'rtl');await direction('ltr');
+    // Smoke-test the uninstrumented shipped page with its own offline simulator too.
+    await page.goto(url.replace('/?','/demo?')+'&kids=8&quiet=1');await page.waitForFunction(()=>window.__lr?.nodes>0);
+    await direction('ltr');await direction('rtl');
     assert.deepEqual(errors,[]);assert.deepEqual(external,[]);
     fs.writeFileSync(path.join(output,'results.json'),JSON.stringify({matrixCases:cases,errors,external,checks:['pointer collapse/expand','queued/routed/success/failure flights survive switch','continuous paths','timeline state and pixel equality','reload preferences','language labels','invalid/blocked storage']},null,2));
     console.log(`${cases} matrix cases plus interaction, animation, persistence and timeline checks passed`);
