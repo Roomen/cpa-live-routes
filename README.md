@@ -79,6 +79,7 @@ To update, replace the library file and restart CPA. To uninstall, set `plugins.
 - **Timeline view** is for looking back. It has one lane per entry credential; rows inside a lane are concurrent requests. Bars are coloured by upstream model, and the legend lists the models in view. A credential used recently (within the larger of the selected range and `active_window_minutes`) keeps its lane even when the range holds no request, labelled as idle with its last request time. Zoom levels are 30 s / 2 min / 10 min, and you can scroll or drag back to the oldest data still in memory. 429 responses are marked, and the tooltip shows `Retry-After`.
 - **Top stats** cover the selected range: requests, in-flight, success rate (done / (done + failed)), output tok/s (output tokens ÷ actual generation time, the union of each request's first-token-to-end interval, idle time excluded) and average latency.
 - **Controls:** language (Portuguese, English, or Simplified Chinese), pause, a temporary animation speed (0.5x / 1x / 2x), and the layout (tabs, or split with the flow strip above the entry lanes). These preferences are stored only in this browser. The page follows the system light/dark theme and honors `prefers-reduced-motion`.
+- **Flow direction:** the ← / → controls select right-to-left (the default described above) or left-to-right with the client on the left: harness / client → session (when expanded) → CPA model → OAuth / API credential. Sessions are visual groupings, not network proxy hops. In left-to-right mode they sit between their client and CPA, within the same client band. Request and response animations cross intermediate cards continuously. This display preference uses its own browser `localStorage` key, `lr-flow-direction` (`rtl` / `ltr`); it does not change tabs/split, the timeline, routing, authentication, statistics, or backend configuration. Unsupported or unavailable stored preferences fall back to right-to-left.
 
 ## Troubleshooting
 
@@ -146,7 +147,7 @@ Client API keys are redacted inside the plugin: only a mask such as `sk-...3f9a`
 
 ## Storage guarantee
 
-Memory only. The plugin writes nothing to disk, and all data is cleared when CPA or the plugin restarts. The page uses browser `localStorage` for UI preferences (`lr-view`, `lr-layout`, `lr-speed`, `lr-range`, `lr-lang`) and, when the viewer opts in to remembering it, the management key (`lr-key`).
+Memory only. The plugin writes nothing to disk, and all data is cleared when CPA or the plugin restarts. The page uses browser `localStorage` for UI preferences (`lr-view`, `lr-layout`, `lr-flow-direction`, `lr-speed`, `lr-range`, `lr-lang`) and, when the viewer opts in to remembering it, the management key (`lr-key`).
 
 `scripts/e2e/run.sh` verifies this against a real CPA process by comparing its open regular files with and without the plugin.
 

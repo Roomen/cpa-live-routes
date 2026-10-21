@@ -13,7 +13,7 @@ for (const f of fs.readdirSync(OUT)) if (f.endsWith('.png') && (!process.argv.in
 const pwPath = process.env.PLAYWRIGHT_MODULE || path.join(execSync('npm root -g').toString().trim(), 'playwright');
 const { chromium } = createRequire(import.meta.url)(pwPath);
 
-const ALLOWED = new Set(['lr-view', 'lr-layout', 'lr-speed', 'lr-range', 'lr-lang']);
+const ALLOWED = new Set(['lr-view', 'lr-layout', 'lr-flow-direction', 'lr-speed', 'lr-range', 'lr-lang']);
 const failures = [], passes = [];
 const check = (ok, msg) => { (ok ? passes : failures).push(msg); console.log((ok ? 'PASS ' : 'FAIL ') + msg); };
 const sleep = ms => new Promise(r => setTimeout(r, ms));

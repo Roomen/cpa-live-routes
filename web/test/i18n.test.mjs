@@ -18,14 +18,15 @@ const server = http.createServer((req, res) => {
 });
 await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
 const origin = `http://127.0.0.1:${server.address().port}`;
-const browser = await chromium.launch({ ...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH } : {}) });
+let browser;
+try {
+browser = await chromium.launch({ ...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH } : {}) });
 const strings = {
   'en': ['Live Routes', 'Demo mode', 'Resume', 'Retention', 'Management key'],
   'pt-br': ['Rotas ao Vivo', 'Modo demo', 'Continuar', 'Retenção', 'Chave de gerenciamento'],
   'zh-cn': ['实时链路', '演示模式', '继续', '保留时长', '管理密钥']
 };
 let count = 0;
-try {
   for (const initial of Object.keys(strings)) {
     const context = await browser.newContext({ locale: initial, viewport: { width: 1280, height: 900 } });
     await context.addInitScript(() => {
@@ -56,7 +57,11 @@ try {
       assert.ok(Number(await page.locator('#cReq').textContent()) > 0);
       const recentLabel = { en: 'Requests in the last', 'pt-br': 'Requisições nos últimos', 'zh-cn': '近' }[lang];
       assert.ok((await page.locator('#lReq').textContent()).startsWith(recentLabel), 'live request count describes the recent range');
-      for (const mode of ['flow', 'time', 'split']) {
+      for (const direction of ['rtl', 'ltr']) for (const mode of ['flow', 'time', 'split']) {
+        await page.click(`#segDirection button[data-d="${direction}"]`);
+        await page.waitForFunction(direction => document.querySelector(`#segDirection button[data-d="${direction}"]`).getAttribute('aria-pressed') === 'true', direction);
+        const label = { en: direction === 'ltr' ? 'Left-to-right' : 'Right-to-left', 'pt-br': direction === 'ltr' ? 'esquerda para a direita' : 'direita para a esquerda', 'zh-cn': direction === 'ltr' ? '从左到右' : '从右到左' }[lang];
+        assert.ok((await page.locator('#cvF').getAttribute('aria-label')).includes(label), `${lang}/${direction}: translated flow description`);
         await page.click(`#segLayout button[data-l="${mode === 'split' ? 'split' : 'tabs'}"]`);
         if (mode !== 'split') await page.click(`#segView button[data-v="${mode}"]`);
         await page.evaluate(() => { window.__canvasText = []; });
@@ -67,7 +72,8 @@ try {
         assert.ok(canvasText.some(text => text.includes(expected)), `${lang}/${mode}: translated canvas text`);
         if (mode !== 'time') {
           const entry = { en: 'Entry', 'pt-br': 'Entrada', 'zh-cn': '入口' }[lang];
-          assert.ok(canvasText.some(text => text.startsWith(entry + ' · OAuth / API')), 'credential column describes entry credentials');
+          // Headings are ellipsized to their column width; font metrics vary by platform.
+          assert.ok(canvasText.some(text => text.startsWith(entry + ' ·')), `${lang}/${mode}/${direction}: translated credential column`);
         }
         assert.deepEqual(errors, [], `${initial}/${lang}/${mode}: browser errors`);
         count++;
@@ -92,4 +98,4 @@ try {
     await context.close();
   }
   console.log(`PASS i18n: ${count} language/view combinations, CSP, dynamic state, config, auth, and persistence`);
-} finally { await browser.close(); await new Promise(resolve => server.close(resolve)); }
+} finally { if (browser) await browser.close(); await new Promise(resolve => server.close(resolve)); }
