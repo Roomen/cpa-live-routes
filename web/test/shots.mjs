@@ -13,7 +13,7 @@ for (const f of fs.readdirSync(OUT)) if (f.endsWith('.png') && (!process.argv.in
 const pwPath = process.env.PLAYWRIGHT_MODULE || path.join(execSync('npm root -g').toString().trim(), 'playwright');
 const { chromium } = createRequire(import.meta.url)(pwPath);
 
-const ALLOWED = new Set(['lr-view', 'lr-layout', 'lr-speed', 'lr-range']);
+const ALLOWED = new Set(['lr-view', 'lr-layout', 'lr-speed', 'lr-range', 'lr-lang']);
 const failures = [], passes = [];
 const check = (ok, msg) => { (ok ? passes : failures).push(msg); console.log((ok ? 'PASS ' : 'FAIL ') + msg); };
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -33,7 +33,7 @@ const INIT = `
 `;
 
 async function newPage(browser, origin, opts, label, log) {
-  const ctx = await browser.newContext({ viewport: opts.viewport, colorScheme: opts.scheme || 'light', reducedMotion: opts.reduced ? 'reduce' : 'no-preference', deviceScaleFactor: opts.dsf || 1, hasTouch: !!opts.touch });
+  const ctx = await browser.newContext({ locale: 'zh-CN', viewport: opts.viewport, colorScheme: opts.scheme || 'light', reducedMotion: opts.reduced ? 'reduce' : 'no-preference', deviceScaleFactor: opts.dsf || 1, hasTouch: !!opts.touch });
   const initLS = opts.ls || {};
   await ctx.addInitScript(INIT);
   if (Object.keys(initLS).length) await ctx.addInitScript(l => { try { if (!sessionStorage.getItem('__init')) { for (const k in l) localStorage.setItem(k, l[k]); sessionStorage.setItem('__init', '1'); } } catch (e) {} }, initLS);
@@ -412,7 +412,7 @@ async function hubHeadingChecks(browser, origin) {
   }
 }
 
-const browser = await chromium.launch();
+const browser = await chromium.launch({ ...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH } : {}) });
 try {
   if (process.argv.includes('--auth-only')) { await authKey(browser); await authForbidden(browser); } else {
   const origin = await startMock(18417, 'key');
