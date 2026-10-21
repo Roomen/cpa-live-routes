@@ -72,7 +72,8 @@ let count = 0;
         assert.ok(canvasText.some(text => text.includes(expected)), `${lang}/${mode}: translated canvas text`);
         if (mode !== 'time') {
           const entry = { en: 'Entry', 'pt-br': 'Entrada', 'zh-cn': '入口' }[lang];
-          assert.ok(canvasText.some(text => text.startsWith(entry + ' · OAuth / API')), 'credential column describes entry credentials');
+          // Headings are ellipsized to their column width; font metrics vary by platform.
+          assert.ok(canvasText.some(text => text.startsWith(entry + ' ·')), `${lang}/${mode}/${direction}: translated credential column`);
         }
         assert.deepEqual(errors, [], `${initial}/${lang}/${mode}: browser errors`);
         count++;
