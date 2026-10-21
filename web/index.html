@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="pt-BR">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -139,67 +139,584 @@ h1{font-size:18px;margin:0;font-weight:650;letter-spacing:.01em}
 <body>
 <div class="wrap">
   <div class="top">
-    <h1>实时链路</h1>
-    <span class="pill" id="pill"><i class="dot"></i><span id="pillT">连接中</span></span>
+    <h1 data-i18n="liveRoutes">Rotas ao Vivo</h1>
+    <span class="pill" id="pill"><i class="dot"></i><span id="pillT" data-i18n="connecting">Conectando</span></span>
     <span class="spacer"></span>
     <div class="ctl">
-      <button class="btn" id="bPause" aria-pressed="false">暂停</button>
-      <div class="seg" id="segSpeed" role="group" aria-label="动画速度">
+      <div class="seg" id="segLang" role="group" aria-label="Language">
+        <button data-lang="pt-br" aria-pressed="true">PT</button><button data-lang="en" aria-pressed="false">EN</button><button data-lang="zh-cn" aria-pressed="false">中文</button>
+      </div>
+      <button class="btn" id="bPause" aria-pressed="false" data-i18n="pause">Pausar</button>
+      <div class="seg" id="segSpeed" role="group" data-i18n-aria="animationSpeed">
         <button data-s="0.5" aria-pressed="false">0.5x</button><button data-s="1" aria-pressed="true">1x</button><button data-s="2" aria-pressed="false">2x</button>
       </div>
-      <div class="seg" id="segRange" role="group" aria-label="时间范围">
-        <button data-r="30000" aria-pressed="false">30秒</button><button data-r="120000" aria-pressed="true">2分钟</button><button data-r="600000" aria-pressed="false">10分钟</button>
+      <div class="seg" id="segRange" role="group" data-i18n-aria="timeRange">
+        <button data-r="30000" aria-pressed="false" data-i18n="seconds30">30s</button><button data-r="120000" aria-pressed="true" data-i18n="minutes2">2min</button><button data-r="600000" aria-pressed="false" data-i18n="minutes10">10min</button>
       </div>
-      <div class="seg" id="segLayout" role="group" aria-label="布局">
-        <button data-l="tabs" aria-pressed="true">标签页</button><button data-l="split" aria-pressed="false">分栏</button>
+      <div class="seg" id="segLayout" role="group" data-i18n-aria="layout">
+        <button data-l="tabs" aria-pressed="true" data-i18n="tabs">Abas</button><button data-l="split" aria-pressed="false" data-i18n="split">Dividido</button>
       </div>
-      <button class="btn" id="bCfg" aria-pressed="false" aria-controls="cfgp">配置</button>
-      <button class="btn" id="bOut" hidden>退出</button>
+      <button class="btn" id="bCfg" aria-pressed="false" aria-controls="cfgp" data-i18n="config">Configuração</button>
+      <button class="btn" id="bOut" hidden data-i18n="logout">Sair</button>
     </div>
   </div>
   <section class="panel cfgp" id="cfgp" hidden>
-    <h2>当前生效的插件配置</h2>
-    <p>这里只读。修改请编辑 CPA 的 <code class="mono">config.yaml</code> 中 <code class="mono">plugins.configs.live-routes</code> 下的键，保存后 CPA 会重新下发配置，本页自动刷新，无需重启。</p>
+    <h2 data-i18n="activePluginConfig">Configuração ativa do plugin</h2>
+    <p data-i18n-html="configReadonly">Somente leitura. Para modificar, edite as chaves em <code class="mono">plugins.configs.live-routes</code> no <code class="mono">config.yaml</code> do CPA. Após salvar, o CPA reenvia a configuração e esta página recarrega automaticamente, sem reiniciar.</p>
     <div class="cfgg" id="cfgg"></div>
     <pre class="mono" id="cfgy"></pre>
   </section>
   <div class="chips">
-    <div class="chip"><small id="lReq">区间请求</small><b class="mono" id="cReq">0</b></div>
-    <div class="chip"><small>进行中</small><b class="mono" id="cInf">0</b></div>
-    <div class="chip"><small>成功率</small><b class="mono" id="cOk">—</b></div>
-    <div class="chip" title="输出 token ÷ 实际生成时长（各请求首字到结束的并集，不含空闲）"><small>输出 tok/s</small><b class="mono" id="cTps">0</b></div>
-    <div class="chip"><small>平均延迟</small><b class="mono" id="cLat">—</b></div>
+    <div class="chip"><small id="lReq" data-i18n="intervalRequests">Requisições no intervalo</small><b class="mono" id="cReq">0</b></div>
+    <div class="chip"><small data-i18n="inProgress">Em andamento</small><b class="mono" id="cInf">0</b></div>
+    <div class="chip"><small data-i18n="successRate">Taxa de sucesso</small><b class="mono" id="cOk">—</b></div>
+    <div class="chip" data-i18n-title="outputToksTooltip"><small data-i18n="outputToks">tok/s saída</small><b class="mono" id="cTps">0</b></div>
+    <div class="chip"><small data-i18n="avgLatency">Latência média</small><b class="mono" id="cLat">—</b></div>
   </div>
   <section class="panel gate" id="gate" hidden>
-    <div id="gForb" hidden><h2>无法访问</h2><p>CPA 管理接口拒绝访问。请先在 CPA 配置管理密钥（remote-management.secret-key 或环境变量 MANAGEMENT_PASSWORD），本机访问也需要配置。其他可能原因包括远程管理访问设置不允许，或失败次数过多被暂时封禁：同一 IP 连续 5 次认证失败会被封禁 30 分钟。请检查配置，或等待封禁到期后重试。</p><button class="btn" id="gRetry">重新输入管理密钥</button></div>
+    <div id="gForb" hidden><h2 data-i18n="accessDenied">Acesso negado</h2><p data-i18n-html="accessDeniedMsg">A interface de gerenciamento do CPA recusou o acesso. Configure a chave de gerenciamento no CPA (remote-management.secret-key ou variável MANAGEMENT_PASSWORD); acesso local também exige configuração. Outras causas possíveis: configurações de acesso remoto não permitem, ou bloqueio temporário por falhas excessivas — 5 falhas consecutivas do mesmo IP resultam em bloqueio de 30 minutos. Verifique a configuração ou aguarde o término do bloqueio.</p><button class="btn" id="gRetry" data-i18n="retryAuth">Inserir chave novamente</button></div>
     <div id="gKeyBox" hidden>
-      <h2>需要管理密钥</h2>
-      <p>每次数据请求均使用 CPA 管理密钥验证。密钥默认只保存在当前标签页，刷新无需重输，关闭标签页即清除。勾选「在此浏览器记住密钥」会把密钥明文保存在本浏览器中，仅建议在个人设备上使用。密钥失效或点击「退出」时自动清除。</p>
-      <div class="fr"><input id="gKey" type="password" autocomplete="off" spellcheck="false" aria-label="管理密钥" placeholder="管理密钥"><button class="btn" id="gGo">验证</button></div>
-      <label class="rem"><input type="checkbox" id="gRemember">在此浏览器记住密钥</label>
+      <h2 data-i18n="needKey">Chave de gerenciamento necessária</h2>
+      <p data-i18n-html="needKeyMsg">Cada requisição de dados usa a chave de gerenciamento do CPA para autenticação. A chave fica salva apenas nesta aba por padrão; recarregar não exige nova entrada, mas fechar a aba limpa a chave. Marcar "Lembrar chave neste navegador" salva a chave em texto simples no navegador — recomendado apenas em dispositivos pessoais. A chave é limpa automaticamente quando expira ou ao clicar em "Sair".</p>
+      <div class="fr"><input id="gKey" type="password" autocomplete="off" spellcheck="false" data-i18n-aria="keyPlaceholder" data-i18n-placeholder="keyPlaceholder" placeholder="Chave de gerenciamento"><button class="btn" id="gGo" data-i18n="verify">Verificar</button></div>
+      <label class="rem"><input type="checkbox" id="gRemember"><span data-i18n="rememberKey">Lembrar chave neste navegador</span></label>
       <p class="bad" id="gErr"></p>
     </div>
   </section>
   <div class="main" id="main">
     <div class="panel mainp" id="mainp">
       <div class="phead">
-        <div class="seg" id="segView" role="group" aria-label="视图">
-          <button data-v="flow" aria-pressed="true">流向</button><button data-v="time" aria-pressed="false">时间轴</button>
+        <div class="seg" id="segView" role="group" data-i18n-aria="view">
+          <button data-v="flow" aria-pressed="true" data-i18n="flow">Fluxo</button><button data-v="time" aria-pressed="false" data-i18n="timeline">Linha do tempo</button>
         </div>
         <span class="muted" id="rangeInfo"></span>
-        <button class="btn" id="bNow" hidden>回到现在</button>
-        <div class="legend" id="legend" aria-label="模型图例"></div>
+        <button class="btn" id="bNow" hidden data-i18n="backToNow">Voltar ao agora</button>
+        <div class="legend" id="legend" data-i18n-aria="modelLegend"></div>
       </div>
-      <div class="box" id="boxF"><canvas id="cvF" aria-label="入口（OAuth / API）、CPA 模型、harness / 客户端、会话流向"></canvas></div>
-      <div class="box" id="boxT"><canvas id="cvT" aria-label="按入口分道的请求时间线"></canvas></div>
+      <div class="box" id="boxF"><canvas id="cvF" data-i18n-aria="flowCanvasLabel"></canvas></div>
+      <div class="box" id="boxT"><canvas id="cvT" data-i18n-aria="timelineCanvasLabel"></canvas></div>
     </div>
-    <div class="panel feed"><h2>最近请求<span id="feedN"></span></h2><ul id="list"></ul></div>
+    <div class="panel feed"><h2><span data-i18n="recentRequests">Requisições recentes</span><span id="feedN"></span></h2><ul id="list"></ul></div>
   </div>
   <div class="tip" id="tip" role="tooltip"></div>
 </div>
 <script>
 (() => {
 'use strict';
+// i18n system for cpa-live-routes
+// Languages: pt-br (default), en, zh-cn
+
+const I18N = {
+  'pt-br': {
+    // Page title & header
+    pageTitle: 'Live Routes',
+    liveRoutes: 'Rotas ao Vivo',
+    connecting: 'Conectando',
+    connected: 'Conectado · Ao vivo',
+    connectedPaused: 'Conectado · Pausado',
+    reconnecting: 'Reconectando',
+    demoMode: 'Modo demo',
+    demoModePaused: 'Modo demo · Pausado',
+
+    // Controls
+    pause: 'Pausar',
+    resume: 'Continuar',
+    animationSpeed: 'Velocidade da animação',
+    timeRange: 'Intervalo de tempo',
+    layout: 'Layout',
+    tabs: 'Abas',
+    split: 'Dividido',
+    config: 'Configuração',
+    logout: 'Sair',
+    backToNow: 'Voltar ao agora',
+
+    // Time units
+    seconds30: '30s',
+    minutes2: '2min',
+    minutes10: '10min',
+
+    // Stats chips
+    intervalRequests: 'Requisições no intervalo',
+    inProgress: 'Em andamento',
+    successRate: 'Taxa de sucesso',
+    outputToks: 'tok/s saída',
+    outputToksTooltip: 'Tokens de saída ÷ tempo real de geração (união do primeiro token ao fim de cada requisição, exclui ociosidade)',
+    avgLatency: 'Latência média',
+
+    // Views
+    view: 'Visualização',
+    flow: 'Fluxo',
+    timeline: 'Linha do tempo',
+    modelLegend: 'Legenda de modelos',
+    rangeInfo: '',
+
+    // Canvas labels
+    flowCanvasLabel: 'Entrada (OAuth / API), modelos CPA, harness / cliente, fluxo de sessões',
+    timelineCanvasLabel: 'Linha do tempo de requisições por entrada',
+
+    // Feed
+    recentRequests: 'Requisições recentes',
+
+    // Config panel
+    activePluginConfig: 'Configuração ativa do plugin',
+    configReadonly: 'Somente leitura. Para modificar, edite as chaves em <code class="mono">plugins.configs.live-routes</code> no <code class="mono">config.yaml</code> do CPA. Após salvar, o CPA reenvia a configuração e esta página recarrega automaticamente, sem reiniciar.',
+    retentionMinutes: 'Retenção',
+    maxRecords: 'Máximo de registros',
+    activeWindowMinutes: 'Janela ativa do fluxo',
+    defaultAnimationSpeed: 'Velocidade padrão da animação',
+    reducedAnimation: 'Reduzir animação',
+    inflightTracking: 'Rastrear requisições em andamento',
+    defaultLayout: 'Layout padrão',
+    minutes: ' min',
+    records: ' reg',
+
+    // Auth gate
+    accessDenied: 'Acesso negado',
+    accessDeniedMsg: 'A interface de gerenciamento do CPA recusou o acesso. Configure a chave de gerenciamento no CPA (remote-management.secret-key ou variável MANAGEMENT_PASSWORD); acesso local também exige configuração. Outras causas possíveis: configurações de acesso remoto não permitem, ou bloqueio temporário por falhas excessivas — 5 falhas consecutivas do mesmo IP resultam em bloqueio de 30 minutos. Verifique a configuração ou aguarde o término do bloqueio.',
+    retryAuth: 'Inserir chave novamente',
+    needKey: 'Chave de gerenciamento necessária',
+    needKeyMsg: 'Cada requisição de dados usa a chave de gerenciamento do CPA para autenticação. A chave fica salva apenas nesta aba por padrão; recarregar não exige nova entrada, mas fechar a aba limpa a chave. Marcar "Lembrar chave neste navegador" salva a chave em texto simples no navegador — recomendado apenas em dispositivos pessoais. A chave é limpa automaticamente quando expira ou ao clicar em "Sair".',
+    keyPlaceholder: 'Chave de gerenciamento',
+    verify: 'Verificar',
+    rememberKey: 'Lembrar chave neste navegador',
+    invalidKey: 'Chave de gerenciamento inválida ou expirada, insira novamente',
+
+    // Tooltip fields
+    client: 'Cliente',
+    clientId: 'Cliente#',
+    unknownClient: 'Cliente desconhecido',
+    keyIp: 'Chave / IP',
+    session: 'Sessão',
+    sessionId: 'ID da sessão',
+    parentSession: 'Sessão pai',
+    none: 'Nenhum',
+    subAgents: 'Subagentes',
+    subAgentsInProgress: 'Subagentes em andamento',
+    exit: 'Saída',
+    exitId: 'Saída#',
+    unassigned: 'Não atribuído',
+    credential: 'Credencial',
+    recent429: '429 recentes',
+    rule: 'Regra',
+    ruleId: 'Regra#',
+    unrecognized: 'Não reconhecido',
+    model: 'Modelo',
+    models: 'modelos',
+    modelCountLabel: 'Número de modelos',
+    recentRangeRequests: 'Requisições nos últimos {}',
+    entry: 'Entrada',
+    foldedHint: 'Recolhido · Passe o mouse para ver detalhes',
+    idleDuration: 'Ocioso por {} min',
+    status: 'Status',
+    start: 'Início',
+    ttft: 'Tempo até primeiro token',
+    totalDuration: 'Duração total',
+    attempts: 'Tentativas',
+    inputOutput: 'Entrada / Saída',
+    cache: 'Cache',
+    reasoning: 'Raciocínio',
+    total: 'Total',
+    requests: 'Requisições',
+    tokens: 'tokens',
+    rateWeight60s: 'Peso de taxa dos últimos 60s',
+    failWeight: 'Peso de falha',
+    collapsedSubagents: 'Subagentes recolhidos',
+    clickExpandCollapse: 'Clique para expandir/recolher sessões',
+    idle: 'Ocioso',
+    idleMinutes: ' min ocioso',
+    lastActivity: 'Última atividade',
+    ago: 'atrás',
+    followNow: 'Seguir agora',
+    lookingBack: 'Olhando para trás',
+
+    // Status labels
+    queued: 'Na fila',
+    routed: 'Roteado',
+    done: 'Sucesso',
+    failed: 'Falha',
+    canceled: 'Cancelado',
+    rejected: 'Rejeitado',
+    lost: 'Perdido',
+    other: 'Outro',
+
+    // Empty states
+    noRequestsInRange: 'Nenhuma requisição neste intervalo',
+    noDataLoaded: 'Sem dados anteriores carregados',
+    noSessions: '{} minutos sem sessões · O plugin só vê requisições que passaram pelo CPA após o carregamento',
+
+    // Flow diagram
+    clients: 'Clientes',
+    sessions: 'Sessões',
+    lineWidthHint: 'Espessura da linha = taxa de requisições dos últimos 60s (decaimento exponencial) · Anel = proporção de tráfego no intervalo / falhas · Clique no cliente para expandir/recolher sessões',
+    windowRequests: 'janela',
+
+    // Demo data
+    workMachine: 'Estação de trabalho',
+    devMachine: 'Máquina de desenvolvimento',
+    demo: 'Demo',
+    CPA: 'CPA',
+    error: 'Erro',
+    button: 'Botão',
+    kids: 'Filhos',
+    quiet: 'Silencioso',
+    win: 'Janela',
+    },
+  'en': {
+    pageTitle: 'Live Routes',
+    liveRoutes: 'Live Routes',
+    connecting: 'Connecting',
+    connected: 'Connected · Live',
+    connectedPaused: 'Connected · Paused',
+    reconnecting: 'Reconnecting',
+    demoMode: 'Demo mode',
+    demoModePaused: 'Demo mode · Paused',
+
+    pause: 'Pause',
+    resume: 'Resume',
+    animationSpeed: 'Animation speed',
+    timeRange: 'Time range',
+    layout: 'Layout',
+    tabs: 'Tabs',
+    split: 'Split',
+    config: 'Config',
+    logout: 'Logout',
+    backToNow: 'Back to now',
+
+    seconds30: '30s',
+    minutes2: '2min',
+    minutes10: '10min',
+
+    intervalRequests: 'Interval requests',
+    inProgress: 'In progress',
+    successRate: 'Success rate',
+    outputToks: 'output tok/s',
+    outputToksTooltip: 'Output tokens ÷ actual generation time (union of first-token-to-end per request, excludes idle)',
+    avgLatency: 'Avg latency',
+
+    view: 'View',
+    flow: 'Flow',
+    timeline: 'Timeline',
+    modelLegend: 'Model legend',
+    rangeInfo: '',
+
+    flowCanvasLabel: 'Entry (OAuth / API), CPA models, harness / client, session flow',
+    timelineCanvasLabel: 'Request timeline by entry',
+
+    recentRequests: 'Recent requests',
+
+    activePluginConfig: 'Active plugin configuration',
+    configReadonly: 'Read-only. To modify, edit keys under <code class="mono">plugins.configs.live-routes</code> in CPA\'s <code class="mono">config.yaml</code>. After saving, CPA re-pushes config and this page auto-refreshes without restart.',
+    retentionMinutes: 'Retention',
+    maxRecords: 'Max records',
+    activeWindowMinutes: 'Flow active window',
+    defaultAnimationSpeed: 'Default animation speed',
+    reducedAnimation: 'Reduced animation',
+    inflightTracking: 'Track in-flight requests',
+    defaultLayout: 'Default layout',
+    minutes: ' min',
+    records: ' records',
+
+    accessDenied: 'Access denied',
+    accessDeniedMsg: 'CPA management interface denied access. Configure the management key in CPA (remote-management.secret-key or MANAGEMENT_PASSWORD env var); local access also requires configuration. Other possible causes: remote management access settings disallow, or temporary ban from excessive failures — 5 consecutive auth failures from the same IP result in a 30-minute ban. Check your configuration or wait for the ban to expire.',
+    retryAuth: 'Re-enter key',
+    needKey: 'Management key required',
+    needKeyMsg: 'Each data request uses the CPA management key for authentication. The key is stored only in this tab by default; reloading does not require re-entry, but closing the tab clears it. Checking "Remember key in this browser" saves the key in plaintext — recommended only on personal devices. The key is automatically cleared when invalid or when clicking "Logout".',
+    keyPlaceholder: 'Management key',
+    verify: 'Verify',
+    rememberKey: 'Remember key in this browser',
+    invalidKey: 'Management key invalid or expired, please re-enter',
+
+    client: 'Client',
+    clientId: 'Client#',
+    unknownClient: 'Unknown client',
+    keyIp: 'Key / IP',
+    session: 'Session',
+    sessionId: 'Session ID',
+    parentSession: 'Parent session',
+    none: 'None',
+    subAgents: 'Sub-agents',
+    subAgentsInProgress: 'Sub-agents in progress',
+    exit: 'Exit',
+    exitId: 'Exit#',
+    unassigned: 'Unassigned',
+    credential: 'Credential',
+    recent429: 'Recent 429s',
+    rule: 'Rule',
+    ruleId: 'Rule#',
+    unrecognized: 'Unrecognized',
+    model: 'Model',
+    models: 'models',
+    modelCountLabel: 'Model count',
+    recentRangeRequests: 'Requests in the last {}',
+    entry: 'Entry',
+    foldedHint: 'Collapsed · Hover for details',
+    idleDuration: 'Idle {} min',
+    status: 'Status',
+    start: 'Start',
+    ttft: 'Time to first token',
+    totalDuration: 'Total duration',
+    attempts: 'Attempts',
+    inputOutput: 'Input / Output',
+    cache: 'Cache',
+    reasoning: 'Reasoning',
+    total: 'Total',
+    requests: 'Requests',
+    tokens: 'tokens',
+    rateWeight60s: 'Rate weight last 60s',
+    failWeight: 'Fail weight',
+    collapsedSubagents: 'Collapsed sub-agents',
+    clickExpandCollapse: 'Click to expand/collapse sessions',
+    idle: 'Idle',
+    idleMinutes: ' min idle',
+    lastActivity: 'Last activity',
+    ago: 'ago',
+    followNow: 'Follow now',
+    lookingBack: 'Looking back',
+
+    queued: 'Queued',
+    routed: 'Routed',
+    done: 'Success',
+    failed: 'Failed',
+    canceled: 'Canceled',
+    rejected: 'Rejected',
+    lost: 'Lost',
+    other: 'Other',
+
+    noRequestsInRange: 'No requests in this range',
+    noDataLoaded: 'No earlier data loaded',
+    noSessions: '{} minutes without sessions · Plugin only sees requests that passed through CPA after loading',
+
+    clients: 'Clients',
+    sessions: 'Sessions',
+    lineWidthHint: 'Line width = request rate last 60s (exponential decay) · Ring = interval traffic share / failures · Click client to expand/collapse sessions',
+    windowRequests: 'window',
+
+    workMachine: 'Workstation',
+    devMachine: 'Dev machine',
+    demo: 'Demo',
+    CPA: 'CPA',
+    error: 'Error',
+    button: 'Button',
+    kids: 'Children',
+    quiet: 'Quiet',
+    win: 'Window',
+    },
+    'zh-cn': {
+    pageTitle: 'Live Routes',
+    liveRoutes: '实时链路',
+    connecting: '连接中',
+    connected: '已连接 · 实时',
+    connectedPaused: '已连接 · 已暂停',
+    reconnecting: '重连中',
+    demoMode: '演示模式',
+    demoModePaused: '演示模式 · 已暂停',
+
+    pause: '暂停',
+    resume: '继续',
+    animationSpeed: '动画速度',
+    timeRange: '时间范围',
+    layout: '布局',
+    tabs: '标签页',
+    split: '分栏',
+    config: '配置',
+    logout: '退出',
+    backToNow: '回到现在',
+
+    seconds30: '30秒',
+    minutes2: '2分钟',
+    minutes10: '10分钟',
+
+    intervalRequests: '区间请求',
+    inProgress: '进行中',
+    successRate: '成功率',
+    outputToks: '输出 tok/s',
+    outputToksTooltip: '输出 token ÷ 实际生成时长（各请求首字到结束的并集，不含空闲）',
+    avgLatency: '平均延迟',
+
+    view: '视图',
+    flow: '流向',
+    timeline: '时间轴',
+    modelLegend: '模型图例',
+    rangeInfo: '',
+
+    flowCanvasLabel: '入口（OAuth / API）、CPA 模型、harness / 客户端、会话流向',
+    timelineCanvasLabel: '按入口分道的请求时间线',
+
+    recentRequests: '最近请求',
+
+    activePluginConfig: '当前生效的插件配置',
+    configReadonly: '这里只读。修改请编辑 CPA 的 <code class="mono">config.yaml</code> 中 <code class="mono">plugins.configs.live-routes</code> 下的键，保存后 CPA 会重新下发配置，本页自动刷新，无需重启。',
+    retentionMinutes: '保留时长',
+    maxRecords: '最大记录数',
+    activeWindowMinutes: '流向活跃窗口',
+    defaultAnimationSpeed: '默认动画速度',
+    reducedAnimation: '减少动画',
+    inflightTracking: '追踪进行中请求',
+    defaultLayout: '默认布局',
+    minutes: ' 分钟',
+    records: ' 条',
+
+    accessDenied: '无法访问',
+    accessDeniedMsg: 'CPA 管理接口拒绝访问。请先在 CPA 配置管理密钥（remote-management.secret-key 或环境变量 MANAGEMENT_PASSWORD），本机访问也需要配置。其他可能原因包括远程管理访问设置不允许，或失败次数过多被暂时封禁：同一 IP 连续 5 次认证失败会被封禁 30 分钟。请检查配置，或等待封禁到期后重试。',
+    retryAuth: '重新输入管理密钥',
+    needKey: '需要管理密钥',
+    needKeyMsg: '每次数据请求均使用 CPA 管理密钥验证。密钥默认只保存在当前标签页，刷新无需重输，关闭标签页即清除。勾选「在此浏览器记住密钥」会把密钥明文保存在本浏览器中，仅建议在个人设备上使用。密钥失效或点击「退出」时自动清除。',
+    keyPlaceholder: '管理密钥',
+    verify: '验证',
+    rememberKey: '在此浏览器记住密钥',
+    invalidKey: '管理密钥无效或已失效，请重新输入',
+
+    client: '客户端',
+    clientId: '客户端#',
+    unknownClient: '未知客户端',
+    keyIp: '密钥 / IP',
+    session: '会话',
+    sessionId: '会话 ID',
+    parentSession: '父会话',
+    none: '无',
+    subAgents: '子代理',
+    subAgentsInProgress: '子代理进行中',
+    exit: '入口',
+    exitId: '入口#',
+    unassigned: '未分配',
+    credential: '凭证',
+    recent429: '近期 429',
+    rule: '规则',
+    ruleId: '规则#',
+    unrecognized: '未识别',
+    model: '模型',
+    models: '个模型',
+    modelCountLabel: '模型数',
+    recentRangeRequests: '近{}请求',
+    entry: '入口',
+    foldedHint: '已折叠 · 悬停查看',
+    idleDuration: '空闲 {} 分',
+    status: '状态',
+    start: '开始',
+    ttft: '首字延迟',
+    totalDuration: '总耗时',
+    attempts: '尝试次数',
+    inputOutput: '输入 / 输出',
+    cache: '缓存',
+    reasoning: '推理',
+    total: '合计',
+    requests: '请求',
+    tokens: 'tokens',
+    rateWeight60s: '近 60 秒速率权重',
+    failWeight: '失败权重',
+    collapsedSubagents: '折叠的子代理',
+    clickExpandCollapse: '点击展开/收起会话',
+    idle: '空闲',
+    idleMinutes: ' 分钟空闲',
+    lastActivity: '上次活动',
+    ago: '前',
+    followNow: '跟随现在',
+    lookingBack: '回看',
+
+    queued: '排队中',
+    routed: '路由中',
+    done: '成功',
+    failed: '失败',
+    canceled: '取消',
+    rejected: '拒绝',
+    lost: '丢失',
+    other: '其他',
+
+    noRequestsInRange: '该时间范围内暂无请求',
+    noDataLoaded: '没有更早的数据',
+    noSessions: '{} 分钟没有会话 · 插件只能看到加载后经过 CPA 的请求',
+
+    clients: '客户端',
+    sessions: '会话',
+    lineWidthHint: '线宽 = 近 60 秒请求速率（指数衰减）· 环 = 区间流量占比 / 失败 · 点击客户端展开 / 收起会话',
+    windowRequests: '窗口',
+
+    workMachine: '工作机',
+    devMachine: '开发机',
+    demo: '演示',
+    CPA: 'CPA',
+    error: '错误',
+    button: '按钮',
+    kids: '子级',
+    quiet: '静默',
+    win: '窗口',
+  }
+};
+
+// Language detection and persistence
+const LANG_KEY = 'lr-lang';
+const SUPPORTED_LANGS = ['pt-br', 'en', 'zh-cn'];
+
+function detectLang() {
+  // 1. Saved preference
+  const saved = (() => { try { return localStorage.getItem(LANG_KEY); } catch(e) { return null; } })();
+  if (saved && SUPPORTED_LANGS.includes(saved)) return saved;
+
+  // 2. Browser language
+  const nav = (navigator.language || navigator.userLanguage || '').toLowerCase();
+  if (nav.startsWith('pt')) return 'pt-br';
+  if (nav.startsWith('zh')) return 'zh-cn';
+  if (nav.startsWith('en')) return 'en';
+
+  // 3. Default to PT-BR
+  return 'pt-br';
+}
+
+let currentLang = detectLang();
+
+function setLang(lang) {
+  if (!SUPPORTED_LANGS.includes(lang)) return;
+  currentLang = lang;
+  try { localStorage.setItem(LANG_KEY, lang); } catch(e) {}
+  applyI18n();
+}
+
+function translate(key) {
+  return (I18N[currentLang] && I18N[currentLang][key]) || (I18N['en'] && I18N['en'][key]) || key;
+}
+
+function applyI18n() {
+  // Static elements with data-i18n attribute
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const key = el.dataset.i18n;
+    const val = translate(key);
+    if (el.tagName === 'INPUT' && el.type !== 'submit') {
+      el.placeholder = val;
+    } else {
+      el.textContent = val;
+    }
+  });
+
+  // Elements with data-i18n-html (for HTML content)
+  document.querySelectorAll('[data-i18n-html]').forEach(el => {
+    el.innerHTML = translate(el.dataset.i18nHtml);
+  });
+
+  // Aria labels
+  document.querySelectorAll('[data-i18n-aria]').forEach(el => {
+    el.setAttribute('aria-label', translate(el.dataset.i18nAria));
+  });
+
+  // Title attributes
+  document.querySelectorAll('[data-i18n-title]').forEach(el => {
+    el.setAttribute('title', translate(el.dataset.i18nTitle));
+  });
+
+  // Update dynamic content that depends on language
+  document.documentElement.lang = currentLang === 'zh-cn' ? 'zh-CN' : currentLang === 'pt-br' ? 'pt-BR' : 'en';
+  document.querySelectorAll('#segLang button').forEach(button => {
+    button.setAttribute('aria-pressed', button.dataset.lang === currentLang);
+  });
+  $('#bPause').textContent = translate(paused ? 'resume' : 'pause');
+  $('#gKey').placeholder = translate('keyPlaceholder');
+  if ($('#gErr').textContent) $('#gErr').textContent = translate('invalidKey');
+  setPill(); renderCfg(); updateFeed(); updateChips(now());
+  // Translated canvas labels can change node widths and layout.
+  F.sig = ''; legendSig = ''; computeVer = -1; chipVer = -1;
+  tip.classList.remove('on'); kick();
+}
+
+
 const $ = s => document.querySelector(s);
 const SANS = 'ui-sans-serif,system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif';
 const MONO = 'ui-monospace,SFMono-Regular,Menlo,Consolas,monospace';
@@ -297,12 +814,12 @@ function repack() {
 const lowerBound = (L, t) => { let lo = 0, hi = L.length; while (lo < hi) { const m = (lo + hi) >> 1; if (L[m].t0 < t) lo = m + 1; else hi = m; } return lo; };
 
 /* name helpers */
-const cliName = id => { const c = D.clients.get(id); return c ? (c.label || c.kind) : (id ? '客户端#' + id : '未知客户端'); };
+const cliName = id => { const c = D.clients.get(id); return c ? (c.label || c.kind) : (id ? translate('clientId') + id : translate('unknownClient')); };
 function cliSub(id) { const c = D.clients.get(id); if (!c) return ''; const k = c.key && D.keys.get(c.key); return [k ? (k.label || k.mask) : '', c.ip].filter(Boolean).join(' · '); }
-const exitName = id => { const x = D.exits.get(id); return x ? (x.label || 'idx ' + x.auth_index) : (id ? '入口#' + id : '未分配'); };
+const exitName = id => { const x = D.exits.get(id); return x ? (x.label || 'idx ' + x.auth_index) : (id ? translate('exitId') + id : translate('unassigned')); };
 const exitSub = id => { const x = D.exits.get(id); return x ? [x.provider, '#' + x.auth_index].filter(Boolean).join(' · ') : ''; };
-const exitProv = id => { const x = D.exits.get(id); return x && x.provider ? x.provider : (id ? '其他' : '排队中'); };
-const ruleLabel = id => { const r = D.rules.get(id); return r ? (r.alias === r.model ? r.alias : r.alias + ' → ' + r.model) : (id ? '规则#' + id : '未识别'); };
+const exitProv = id => { const x = D.exits.get(id); return x && x.provider ? x.provider : (id ? translate('other') : translate('queued')); };
+const ruleLabel = id => { const r = D.rules.get(id); return r ? (r.alias === r.model ? r.alias : r.alias + ' → ' + r.model) : (id ? translate('ruleId') + id : translate('unrecognized')); };
 const sessShort = id => { const s = D.sessions.get(id); return s ? s.short : '#' + id; };
 const mini = () => W < 560 && effLayout() !== 'split';
 const cliShort = id => { const c = D.clients.get(id); if (!c) return cliName(id); const w = (c.label || '').split(/\s+/)[0]; return w || c.kind; };
@@ -311,7 +828,7 @@ const cliColor = id => C.cl[((id || 1) - 1 + 6) % 6];
 /* timeline bars are coloured by upstream model; a model keeps the colour it first got for the life of the page */
 const mdlIdx = new Map(), mdlOf = id => { const r = D.rules.get(id); return r ? r.model : ''; };
 const mdlColor = id => { const m = mdlOf(id); if (!m) return C.faint; let i = mdlIdx.get(m); if (i == null) mdlIdx.set(m, i = mdlIdx.size); return C.cl[i % 6]; };
-const stLabel = r => ({ queued: '排队', routed: '路由中', done: '成功', failed: '失败' + (r.status ? ' ' + r.status : ''), canceled: '取消', rejected: '拒绝', lost: '丢失' }[r.state] || r.state);
+const stLabel = r => ({ queued: translate('queued'), routed: translate('routed'), done: translate('done'), failed: translate('failed') + (r.status ? ' ' + r.status : ''), canceled: translate('canceled'), rejected: translate('rejected'), lost: translate('lost') }[r.state] || r.state);
 const stClass = r => r.state === 'done' ? 'ok' : r.state === 'failed' ? 'err' : isLive(r.state) ? 'run' : 'cx';
 
 /* ---------- animation state ---------- */
@@ -454,7 +971,7 @@ function computeFlow(t) {
 const ruleLines = (r, stack) => !r || r.alias === r.model ? [r ? r.alias : '?'] : stack ? [r.alias, '→ ' + r.model] : [r.alias + ' → ' + r.model];
 const modelCount = rl => new Set(rl.map(n => D.rules.get(n.id)?.model).filter(Boolean)).size;
 function hubHeading(ctx, small, split, rl) {
-  const titleFont = `700 ${split ? 12 : small ? 13 : 15}px ${SANS}`, countFont = `${small ? 9.5 : 11}px ${SANS}`, label = modelCount(rl) + ' 个模型';
+  const titleFont = `700 ${split ? 12 : small ? 13 : 15}px ${SANS}`, countFont = `${small ? 9.5 : 11}px ${SANS}`, label = modelCount(rl) + ' ' + translate('models');
   ctx.font = titleFont; const titleWidth = ctx.measureText('CPA').width;
   ctx.font = countFont;
   return { titleFont, countFont, label, minWidth: Math.ceil(titleWidth + 12 + ctx.measureText(label).width + (small ? 20 : 36)) };
@@ -576,7 +1093,7 @@ function drawNode(n) {
   const small = W < 560 || effLayout() === 'split', x = n.x, y = n.y - n.h / 2, w = n.w, h = n.h;
   X.save(); X.globalAlpha = clamp(n.alpha, 0, 1) * dimN(n);
   nodeBox(n);
-  const bf = `10px ${MONO}`, badge = n.idle ? '空闲 ' + Math.floor(n.idle / 60000) + ' 分' : '×' + n.n + (n.inf ? ' ●' + n.inf : ''); X.font = bf; const bw = X.measureText(badge).width, px = x + (small ? 8 : 11), iw = w - (small ? 16 : 22);
+  const bf = `10px ${MONO}`, badge = n.idle ? translate('idleDuration').replace('{}', Math.floor(n.idle / 60000)) : '×' + n.n + (n.inf ? ' ●' + n.inf : ''); X.font = bf; const bw = X.measureText(badge).width, px = x + (small ? 8 : 11), iw = w - (small ? 16 : 22);
   const f1 = `600 ${small ? 10.5 : 11.5}px ${SANS}`, f2 = `${small ? 9.5 : 11}px ${SANS}`, three = h >= 52;
   const l1 = three ? y + 15 : y + h * .32, l2 = three ? y + 33 : y + h * .72;
   if (n.type === 'c') {
@@ -586,7 +1103,7 @@ function drawNode(n) {
     X.fillStyle = cliColor(n.id); X.beginPath(); X.arc(px + 8, l1, 3.2, 0, 7); X.fill();
     txt(nm, px + 8 + dotW - 3, l1, f1, C.text, cw - dotW - 6);
     if (!mini()) txt(badge, px + iw, l1, bf, C.faint, 0, 'right');
-    const tg = sc ? (expanded.has(n.id) ? '▾ ' : '▸ ') + sc + ' 会话' : '';
+    const tg = sc ? (expanded.has(n.id) ? '▾ ' : '▸ ') + sc + ' ' + translate('sessions') : '';
     if (mini()) { txt(badge, px + iw, l2, bf, C.faint, 0, 'right'); if (tg) txt(tg, px, l2, f2, C.info, iw - bw - 4); }
     else if (three) { txt(cliSub(n.id), px, l2, f2, C.muted, iw); if (tg) txt(tg, px, y + h - 11, f2, C.info, iw); }
     else { X.font = f2; const tw2 = tg ? X.measureText(tg).width + 6 : 0; txt(cliSub(n.id), px, l2, f2, C.muted, iw - tw2); if (tg) txt(tg, px + iw, l2, f2, C.info, 0, 'right'); }
@@ -594,10 +1111,10 @@ function drawNode(n) {
     const ss = D.sessions.get(n.id), par = !n.kid && ss && ss.parent && D.sessions.get(ss.parent), p = n.kid && F.nodes.get('s' + n.par), one = h < 30;
     /* tree connector down the indent gutter from the root card; the last child's line ends at it (└), earlier ones are crossed (├) */
     if (p) { const gx = Math.round(p.x + (x - p.x) / 2) + .5; X.strokeStyle = mix(C.border, C.faint, .75); X.lineWidth = 1; X.beginPath(); X.moveTo(gx, p.y + p.h / 2); X.lineTo(gx, n.y); X.lineTo(x, n.y); X.stroke(); }
-    const nm = n.fold ? '+' + n.fold.length + ' 子代理' : (par ? '↳ ' : '') + sessShort(n.id);
+    const nm = n.fold ? '+' + n.fold.length + ' ' + translate('subAgents') : (par ? '↳ ' : '') + sessShort(n.id);
     txt(nm, px, one ? y + h / 2 : l1, `600 ${small || n.kid ? 10 : 11}px ${n.fold ? SANS : MONO}`, n.kid ? C.muted : C.text, iw - bw - 4);
     txt(badge, px + iw, one ? y + h / 2 : l1, bf, C.faint, 0, 'right');
-    if (!one) txt(n.fold ? '已折叠 · 悬停查看' : n.kid ? '子代理' : par ? '父 ' + par.short : n.kids ? '含 ' + n.kids + ' 子代理' + (n.kinf ? ' · ●' + n.kinf : '') : '会话', px, l2, f2, n.kids && !n.kid ? C.info : C.muted, iw);
+    if (!one) txt(n.fold ? translate('foldedHint') : n.kid ? translate('subAgents') : par ? translate('parentSession') + ' ' + par.short : n.kids ? translate('subAgents') + ' ' + n.kids + (n.kinf ? ' · ●' + n.kinf : '') : translate('session'), px, l2, f2, n.kids && !n.kid ? C.info : C.muted, iw);
   } else {
     const r = small ? 11 : 16, lw = small ? 3.5 : 4.5, rcx = x + (small ? 7 : 10) + r + lw / 2, rcy = y + h / 2, ring = h >= 30 && !mini();
     let tx = x + (small ? 8 : 11);
@@ -616,7 +1133,7 @@ function drawNode(n) {
     txt(mini() ? exitShort(n.id) : exitName(n.id), tx, y1, f1, C.text, iw2);
     if (!mini()) txt(exitSub(n.id), tx, y2, f2, C.muted, iw2 - bw - 4);
     txt(badge, tx + iw2, y2, bf, C.faint, 0, 'right');
-    if (n.t429) { const lb = '近期 429'; X.font = `600 9px ${SANS}`; const lw2 = X.measureText(lb).width + 10; X.fillStyle = rgba(C.err, .15); rr(x + w - lw2 - 5, y - 6, lw2, 13, 6); X.fill(); X.strokeStyle = rgba(C.err, .6); X.lineWidth = 1; rr(x + w - lw2 - 4.5, y - 5.5, lw2 - 1, 12, 6); X.stroke(); txt(lb, x + w - lw2 / 2 - 5, y + .5, `600 9px ${SANS}`, C.err, 0, 'center'); }
+    if (n.t429) { const lb = translate('recent429'); X.font = `600 9px ${SANS}`; const lw2 = X.measureText(lb).width + 10; X.fillStyle = rgba(C.err, .15); rr(x + w - lw2 - 5, y - 6, lw2, 13, 6); X.fill(); X.strokeStyle = rgba(C.err, .6); X.lineWidth = 1; rr(x + w - lw2 - 4.5, y - 5.5, lw2 - 1, 12, 6); X.stroke(); txt(lb, x + w - lw2 / 2 - 5, y + .5, `600 9px ${SANS}`, C.err, 0, 'center'); }
   }
   X.restore();
 }
@@ -633,24 +1150,24 @@ function drawHub() {
     const r = D.rules.get(n.id), ty = n.ry - (hub.rh - 3) / 2, dm = (rel ? (rel.N.has(n.key) ? 1 : .35) : 1) * clamp(n.alpha, .2, 1), lines = ruleLines(r, stack);
     const fnt = `${small ? 9 : stack ? 10.5 : 11}px ${MONO}`; X.globalAlpha = dm;
     if (n.inf && !reduced()) { X.fillStyle = rgba(C.info, .14); rr(x + 5, ty, w - 10, hub.rh - 3, 6); X.fill(); }
-    if (lines.length === 1) txt(r ? lines[0] : '未识别', px, n.ry, fnt, C.text, iw);
+    if (lines.length === 1) txt(r ? lines[0] : translate('unrecognized'), px, n.ry, fnt, C.text, iw);
     else { txt(lines[0], px, n.ry - 6.5, fnt, C.text, iw); txt(lines[1], px, n.ry + 6.5, fnt, C.faint, iw); }
     for (const pxX of [x, x + w]) { X.fillStyle = C.card; X.strokeStyle = mix(C.border, C.info, clamp(n.n ? .8 : 0, 0, 1)); X.lineWidth = 1.5; X.beginPath(); X.arc(pxX, n.ry, 3.2, 0, 7); X.fill(); X.stroke(); }
     X.globalAlpha = 1;
   });
-  if (!split) txt('区间内转发 ' + rl.reduce((s, n) => s + n.n, 0), px, y + h - (small ? 11 : 14), `${small ? 9.5 : 10.5}px ${SANS}`, C.faint, iw);
+  if (!split) txt(translate('windowRequests') + ' ' + rl.reduce((s, n) => s + n.n, 0), px, y + h - (small ? 11 : 14), `${small ? 9.5 : 10.5}px ${SANS}`, C.faint, iw);
   X.restore();
 }
 function drawChrome() {
   const split = effLayout() === 'split', small = W < 560, y = split ? 13 : small ? 20 : 26, f = `600 ${small || split ? 10.5 : 12}px ${SANS}`, ls = F.lists;
-  txt('入口 · OAuth / API · ' + ls.x.length, G.pad + 2, y, f, C.muted);
-  txt('CPA 模型', hub.x + hub.w / 2, y, f, C.muted, 0, 'center');
-  if (ls.s.length) { txt('harness / 客户端 · ' + ls.c.length, ls.c[0].x + 2, y, f, C.muted); txt('会话 · ' + ls.s.length, W - G.pad - 2, y, f, C.muted, 0, 'right'); }
-  else txt('harness / 客户端 · ' + ls.c.length, W - G.pad - 2, y, f, C.muted, 0, 'right');
+  txt(translate('entry') + ' · OAuth / API · ' + ls.x.length, G.pad + 2, y, f, C.muted);
+  txt('CPA ' + translate('model'), hub.x + hub.w / 2, y, f, C.muted, 0, 'center');
+  if (ls.s.length) { txt('harness / ' + translate('client') + ' · ' + ls.c.length, ls.c[0].x + 2, y, f, C.muted); txt(translate('session') + ' · ' + ls.s.length, W - G.pad - 2, y, f, C.muted, 0, 'right'); }
+  else txt('harness / ' + translate('client') + ' · ' + ls.c.length, W - G.pad - 2, y, f, C.muted, 0, 'right');
   if (split) return;
   const ly = FH - 16, lf = `${small ? 9.5 : 11}px ${SANS}`; let lx = small ? 8 : 16;
-  for (const [c, t] of [[C.ok, '成功'], [C.err, '失败'], [C.info, '进行中']]) { X.fillStyle = c; X.beginPath(); X.arc(lx + 3, ly, 3, 0, 7); X.fill(); txt(t, lx + 10, ly, lf, C.faint); X.font = lf; lx += 10 + X.measureText(t).width + 12; }
-  if (!small) txt('线宽 = 近 60 秒请求速率（指数衰减）· 环 = 区间流量占比 / 失败 · 点击客户端展开 / 收起会话', W - 16, ly, lf, C.faint, 0, 'right');
+  for (const [c, k] of [[C.ok, 'done'], [C.err, 'failed'], [C.info, 'inProgress']]) { X.fillStyle = c; X.beginPath(); X.arc(lx + 3, ly, 3, 0, 7); X.fill(); txt(translate(k), lx + 10, ly, lf, C.faint); X.font = lf; lx += 10 + X.measureText(translate(k)).width + 12; }
+  if (!small) txt(translate('lineWidthHint'), W - 16, ly, lf, C.faint, 0, 'right');
 }
 function drawFlights() {
   if (!animOn()) return;
@@ -698,7 +1215,7 @@ function drawFlow(t) {
   X = fctx; sizeCv(cvF, W, FH);
   X.setTransform(dpr, 0, 0, dpr, 0, 0); X.clearRect(0, 0, W, FH); X.fillStyle = C.card; X.fillRect(0, 0, W, FH);
   if (!G) layoutFlow();
-  if (!F.nodes.size) { txt('近 ' + Math.round(rootTtl() / 60000) + ' 分钟没有会话 · 插件只能看到加载后经过 CPA 的请求', W / 2, FH / 2, `13px ${SANS}`, C.faint, W - 32, 'center'); return; }
+  if (!F.nodes.size) { txt(translate('noSessions').replace('{}', Math.round(rootTtl() / 60000)), W / 2, FH / 2, `13px ${SANS}`, C.faint, W - 32, 'center'); return; }
   drawChrome(); drawLinks();
   for (const n of F.lists.c) drawNode(n);
   for (const n of F.lists.s) drawNode(n);
@@ -730,22 +1247,22 @@ function computeRel() {
   rel = { N, E };
 }
 const trow = (a, b, c) => `<div><span>${esc(a)}</span><span class="mono ${c || ''}">${esc(b)}</span></div>`;
-const rangeLabel = () => rangeMs === 30000 ? '30秒' : rangeMs === 120000 ? '2分钟' : '10分钟';
+const rangeLabel = () => rangeMs === 30000 ? translate('seconds30') : rangeMs === 120000 ? translate('minutes2') : translate('minutes10');
 function nodeTip(h) {
-  if (h.e) { const e = h.e, na = F.nodes.get(e.a), nb = F.nodes.get(e.b); return `<b>${esc(nodeTitle(na))} → ${esc(nodeTitle(nb))}</b>` + trow('近 60 秒速率权重', e.w.toFixed(1)) + trow('失败权重', e.ew.toFixed(1)); }
-  if (h.k === 'hub') return '<b>CPA</b>' + trow('模型数', modelCount(F.lists.r));
+  if (h.e) { const e = h.e, na = F.nodes.get(e.a), nb = F.nodes.get(e.b); return `<b>${esc(nodeTitle(na))} → ${esc(nodeTitle(nb))}</b>` + trow(translate('rateWeight60s'), e.w.toFixed(1)) + trow(translate('failWeight'), e.ew.toFixed(1)); }
+  if (h.k === 'hub') return '<b>CPA</b>' + trow(translate('modelCountLabel'), modelCount(F.lists.r));
   const n = h.n, rate = n.ok + n.fail >= 1 ? (n.ok / (n.ok + n.fail) * 100).toFixed(1) + '%' : '—';
   let s = `<b>${esc(nodeTitle(n))}</b>`;
-  if (n.type === 'c') { const c = D.clients.get(n.id); s += trow('harness', c ? c.kind : '—') + trow('密钥 / IP', cliSub(n.id) || '—') + trow('会话数', n.sess.size) + (n.sess.size ? trow('', expanded.has(n.id) ? '点击收起会话' : '点击展开会话') : ''); }
+  if (n.type === 'c') { const c = D.clients.get(n.id); s += trow('harness', c ? c.kind : '—') + trow(translate('keyIp'), cliSub(n.id) || '—') + trow(translate('sessions'), n.sess.size) + (n.sess.size ? trow('', expanded.has(n.id) ? translate('clickExpandCollapse') : translate('clickExpandCollapse')) : ''); }
   const ks = a => a.slice(0, 4).map(sessShort).join(' ') + (a.length > 4 ? ' …+' + (a.length - 4) : '');
-  if (n.type === 's' && n.fold) s += trow('折叠的子代理', ks(n.fold)) + trow('父会话', sessShort(n.par));
-  else if (n.type === 's') { const ss = D.sessions.get(n.id) || {}, par = ss.parent && D.sessions.get(ss.parent); s += trow('会话 ID', ss.sid || '—') + trow('父会话', par ? par.sid : '无') + (n.kids ? trow('子代理 (' + n.kids + ')', ks(n.kidIds)) + trow('子代理进行中', n.kinf) : ''); }
-  if (n.idle) s += trow('空闲', Math.floor(n.idle / 60000) + ' 分钟');
-  if (n.type === 'x') s += trow('凭证', exitSub(n.id) || '—') + (n.t429 ? trow('近期 429', fmtClock(n.t429, true), 'bad') : '');
-  if (n.type === 'r') s += trow('规则', ruleLabel(n.id));
-  return s + trow('请求 (' + rangeLabel() + ')', n.n) + trow('进行中', n.inf) + trow('成功率', n.ok + n.fail >= 3 ? rate : '—') + trow('tokens', fmtK(n.tok)) + trow('平均延迟', n.ok >= 3 ? (n.lat / n.ok / 1000).toFixed(1) + 's' : '—');
+  if (n.type === 's' && n.fold) s += trow(translate('collapsedSubagents'), ks(n.fold)) + trow(translate('parentSession'), sessShort(n.par));
+  else if (n.type === 's') { const ss = D.sessions.get(n.id) || {}, par = ss.parent && D.sessions.get(ss.parent); s += trow(translate('sessionId'), ss.sid || '—') + trow(translate('parentSession'), par ? par.sid : translate('none')) + (n.kids ? trow(translate('subAgents') + ' (' + n.kids + ')', ks(n.kidIds)) + trow(translate('subAgentsInProgress'), n.kinf) : ''); }
+  if (n.idle) s += trow(translate('idle'), Math.floor(n.idle / 60000) + translate('minutes'));
+  if (n.type === 'x') s += trow(translate('credential'), exitSub(n.id) || '—') + (n.t429 ? trow(translate('recent429'), fmtClock(n.t429, true), 'bad') : '');
+  if (n.type === 'r') s += trow(translate('rule'), ruleLabel(n.id));
+  return s + trow(translate('requests') + ' (' + rangeLabel() + ')', n.n) + trow(translate('inProgress'), n.inf) + trow(translate('successRate'), n.ok + n.fail >= 3 ? rate : '—') + trow(translate('tokens'), fmtK(n.tok)) + trow(translate('avgLatency'), n.ok >= 3 ? (n.lat / n.ok / 1000).toFixed(1) + 's' : '—');
 }
-const nodeTitle = n => !n ? '' : n.type === 'c' ? cliName(n.id) : n.type === 's' ? (n.fold ? '+' + n.fold.length + ' 子代理' : sessShort(n.id)) : n.type === 'r' ? ruleLabel(n.id) : exitName(n.id);
+const nodeTitle = n => !n ? '' : n.type === 'c' ? cliName(n.id) : n.type === 's' ? (n.fold ? '+' + n.fold.length + ' ' + translate('subAgents') : sessShort(n.id)) : n.type === 'r' ? ruleLabel(n.id) : exitName(n.id);
 function placeTip(cx, cy) {
   const tw = tip.offsetWidth, th = tip.offsetHeight;
   let l = cx + 14; if (l + tw > innerWidth - 4) l = cx - tw - 14; l = clamp(l, 4, Math.max(4, innerWidth - tw - 4));
@@ -810,7 +1327,7 @@ function drawTimeline(t) {
   X.setTransform(dpr, 0, 0, dpr, 0, 0); X.fillStyle = C.card; X.fillRect(0, 0, W, TH);
   const PL = LAB, PR = W - 16, span = PR - PL, xOf = tt => PL + (tt - win.start) / rangeMs * span;
   laneInfo = lanes; hits = [];
-  if (!lanes.length) { txt('该时间范围内暂无请求', W / 2, TH / 2, `13px ${SANS}`, C.faint, 0, 'center'); drawAxis(win, PL, PR, TOPM, TH - AXH - 2, xOf, t); return; }
+  if (!lanes.length) { txt(translate('noRequestsInRange'), W / 2, TH / 2, `13px ${SANS}`, C.faint, 0, 'center'); drawAxis(win, PL, PR, TOPM, TH - AXH - 2, xOf, t); return; }
   const stepG = rangeMs === 30000 ? 5000 : rangeMs === 120000 ? 20000 : 60000;
   X.strokeStyle = C.border; X.lineWidth = 1; X.globalAlpha = .7; X.beginPath();
   for (let g = Math.ceil(win.start / stepG) * stepG; g <= win.end; g += stepG) { const gx = Math.round(xOf(g)) + .5; if (gx < PL || gx > PR) continue; X.moveTo(gx, TOPM - 4); X.lineTo(gx, axisY); }
@@ -827,9 +1344,9 @@ function drawTimeline(t) {
     if (hov) { X.fillStyle = C.accent; X.globalAlpha = .07; X.fillRect(0, ln.y, W, ln.h); X.globalAlpha = 1; }
     X.strokeStyle = C.border; X.globalAlpha = .8; X.beginPath(); X.moveTo(0, ln.y + ln.h - .5); X.lineTo(W, ln.y + ln.h - .5); X.stroke(); X.globalAlpha = 1;
     X.globalAlpha = dim ? .5 : 1;
-    const nm = ln.key ? exitName(ln.key) : '排队中 / 未分配';
-    if (narrow) { txt(nm, 8, ln.y + ln.h / 2 - 8, `600 11px ${SANS}`, C.text, LAB - 12); if (ln.spark.some(v => v)) sparkline(ln, 8, ln.y + ln.h / 2 + 2, LAB - 16, 11); else txt('空闲', 8, ln.y + ln.h / 2 + 8, `10px ${SANS}`, C.muted, LAB - 12); }
-    else { txt(nm, 12, ln.y + ln.h / 2 - 8, `600 12px ${SANS}`, C.text, LAB - 92); const idle = !ln.spark.some(v => v); txt(ln.n60 ? (ln.key ? '#' + (D.exits.get(ln.key) || {}).auth_index + ' · ' : '') + ln.n60 + ' /分' : '空闲' + (ln.last ? ' · 上次 ' + fmtClock(ln.last) : ''), 12, ln.y + ln.h / 2 + 8, `11px ${SANS}`, C.muted, idle ? LAB - 20 : LAB - 92); if (!idle) sparkline(ln, LAB - 74, ln.y + ln.h / 2 - 9, 62, 18); }
+    const nm = ln.key ? exitName(ln.key) : translate('queued') + ' / ' + translate('unassigned');
+    if (narrow) { txt(nm, 8, ln.y + ln.h / 2 - 8, `600 11px ${SANS}`, C.text, LAB - 12); if (ln.spark.some(v => v)) sparkline(ln, 8, ln.y + ln.h / 2 + 2, LAB - 16, 11); else txt(translate('idle'), 8, ln.y + ln.h / 2 + 8, `10px ${SANS}`, C.muted, LAB - 12); }
+    else { txt(nm, 12, ln.y + ln.h / 2 - 8, `600 12px ${SANS}`, C.text, LAB - 92); const idle = !ln.spark.some(v => v); txt(ln.n60 ? (ln.key ? '#' + (D.exits.get(ln.key) || {}).auth_index + ' · ' : '') + ln.n60 + ' /min' : translate('idle') + (ln.last ? ' · ' + translate('lastActivity') + ' ' + fmtClock(ln.last) : ''), 12, ln.y + ln.h / 2 + 8, `11px ${SANS}`, C.muted, idle ? LAB - 20 : LAB - 92); if (!idle) sparkline(ln, LAB - 74, ln.y + ln.h / 2 - 9, 62, 18); }
     X.globalAlpha = 1;
   });
   X.save(); X.beginPath(); X.rect(PL + 1, 0, W - PL, axisY); X.clip();
@@ -869,12 +1386,12 @@ function drawTimeline(t) {
     X.globalAlpha = 1;
   }
   X.restore();
-  if (!vis.length) { const last = lanes.reduce((m, l) => Math.max(m, l.last), 0), ago = t - last, ag = ago < 60000 ? Math.max(1, Math.round(ago / 1000)) + ' 秒' : ago < 3600000 ? Math.round(ago / 60000) + ' 分钟' : Math.round(ago / 3600000) + ' 小时'; txt('区间内无请求' + (last ? ' · 上次请求 ' + ag + '前' : ''), (PL + PR) / 2, lanes[0].y + lanes[0].h / 2, `11px ${SANS}`, C.faint, PR - PL - 20, 'center'); }
+  if (!vis.length) { const last = lanes.reduce((m, l) => Math.max(m, l.last), 0), ago = t - last, ag = ago < 60000 ? Math.max(1, Math.round(ago / 1000)) + 's' : ago < 3600000 ? Math.round(ago / 60000) + translate('minutes').trim() : Math.round(ago / 3600000) + 'h'; txt(translate('noRequestsInRange') + (last ? ' · ' + translate('lastActivity') + ' ' + ag + translate('ago') : ''), (PL + PR) / 2, lanes[0].y + lanes[0].h / 2, `11px ${SANS}`, C.faint, PR - PL - 20, 'center'); }
   const gr = X.createLinearGradient(PL, 0, PL + 22, 0); gr.addColorStop(0, C.card); gr.addColorStop(1, rgba(C.card, 0)); X.fillStyle = gr; X.fillRect(PL + 1, TOPM - 4, 22, axisY - TOPM + 4);
   drawAxis(win, PL, PR, TOPM, axisY, xOf, t);
   if (oldestT && win.start < oldestT && !truncated) {
     const ox = clamp(xOf(oldestT), PL, PR); X.fillStyle = C.ter; X.globalAlpha = .6; X.fillRect(PL + 1, TOPM - 4, ox - PL - 1, axisY - TOPM + 4); X.globalAlpha = 1;
-    if (ox - PL > 80) txt('没有更早的数据', (PL + ox) / 2, TOPM + 6, `10px ${SANS}`, C.faint, 0, 'center');
+    if (ox - PL > 80) txt(translate('noDataLoaded'), (PL + ox) / 2, TOPM + 6, `10px ${SANS}`, C.faint, 0, 'center');
   }
   syncLegend(vis);
 }
@@ -882,7 +1399,7 @@ function drawAxis(win, PL, PR, topY, axisY, xOf, t) {
   const stepG = rangeMs === 30000 ? 5000 : rangeMs === 120000 ? 20000 : 60000, px = stepG / rangeMs * (PR - PL), skip = Math.max(1, Math.ceil(64 / px));
   if (win.end >= t - 1) {
     X.strokeStyle = C.accent; X.globalAlpha = .55; X.lineWidth = 1; X.beginPath(); X.moveTo(PR + .5, topY - 4); X.lineTo(PR + .5, axisY); X.stroke(); X.globalAlpha = 1;
-    txt('现在', PR, 9, `600 11px ${SANS}`, C.accent, 0, 'center');
+    txt(translate('followNow').replace(' ', ' · '), PR, 9, `600 11px ${SANS}`, C.accent, 0, 'center');
   }
   X.font = `10px ${MONO}`; X.fillStyle = C.muted; X.textAlign = 'center'; X.textBaseline = 'middle';
   for (let k = Math.ceil(win.start / stepG); k * stepG <= win.end; k++) { if (k % skip) continue; const gx = xOf(k * stepG); if (gx < PL + 24 || gx > PR - 20) continue; X.fillText(fmtClock(k * stepG, rangeMs <= 120000), gx, axisY + 12); }
@@ -903,14 +1420,14 @@ function syncLegend(vis) {
 function recTip(r) {
   const cls = r.state === 'done' ? 'good' : r.state === 'failed' ? 'bad' : '', ss = D.sessions.get(r.session), par = ss && ss.parent && D.sessions.get(ss.parent), tk = r.tok;
   let s = `<b><i style="background:${mdlColor(r.rule)}"></i>${esc(ruleLabel(r.rule))}</b>`;
-  s += trow('客户端', cliName(r.client)) + trow('密钥 / IP', cliSub(r.client) || '—') + trow('会话', ss ? ss.short + (par ? ' ← ' + par.short : '') : '—') + trow('入口', exitName(r.exit) + (exitSub(r.exit) ? ' · ' + exitSub(r.exit) : ''));
-  s += trow('状态', stLabel(r) + (r.stream ? ' · stream' : ''), cls) + trow('开始', fmtClock(r.t0, true));
-  if (r.ttft) s += trow('首字延迟', fmtSec(r.ttft));
-  s += trow('总耗时', fmtSec(r.lat || ((r.t1 || now()) - r.t0)));
-  if (tk) s += trow('输入 / 输出', tk.in + ' / ' + tk.out) + (tk.cache ? trow('缓存', tk.cache) : '') + (tk.reason ? trow('推理', tk.reason) : '') + trow('合计 tokens', tk.total);
-  if (r.attempts > 1) s += trow('尝试次数', r.attempts, 'bad');
+  s += trow(translate('client'), cliName(r.client)) + trow(translate('keyIp'), cliSub(r.client) || '—') + trow(translate('session'), ss ? ss.short + (par ? ' ← ' + par.short : '') : '—') + trow(translate('exit'), exitName(r.exit) + (exitSub(r.exit) ? ' · ' + exitSub(r.exit) : ''));
+  s += trow(translate('status'), stLabel(r) + (r.stream ? ' · stream' : ''), cls) + trow(translate('start'), fmtClock(r.t0, true));
+  if (r.ttft) s += trow(translate('ttft'), fmtSec(r.ttft));
+  s += trow(translate('totalDuration'), fmtSec(r.lat || ((r.t1 || now()) - r.t0)));
+  if (tk) s += trow(translate('inputOutput'), tk.in + ' / ' + tk.out) + (tk.cache ? trow(translate('cache'), tk.cache) : '') + (tk.reason ? trow(translate('reasoning'), tk.reason) : '') + trow(translate('total') + ' tokens', tk.total);
+  if (r.attempts > 1) s += trow(translate('attempts'), r.attempts, 'bad');
   if (r.retry_after) s += trow('retry_after', r.retry_after + ' s', 'bad');
-  if (r.err) s += trow('错误', r.err, 'bad');
+  if (r.err) s += trow(translate('error'), r.err, 'bad');
   return s;
 }
 function setTPointer(e) {
@@ -962,17 +1479,17 @@ function updateChips(t) {
   }
   iv.sort((x, y) => x[0] - y[0]); let busy = 0, ce = -Infinity; for (const [a, b] of iv) { if (a > ce) { busy += b - a; ce = b; } else if (b > ce) { busy += b - ce; ce = b; } }
   const tps = out / (busy / 1000);
-  $('#lReq').textContent = (viewEnd == null ? '近' + rangeLabel() : '窗口') + '请求';
+  $('#lReq').textContent = viewEnd == null ? translate('recentRangeRequests').replace('{}', rangeLabel()) : translate('windowRequests') + ' ' + translate('requests');
   $('#cReq').textContent = n; $('#cInf').textContent = inflight.size;
   $('#cOk').textContent = ok + fail >= 3 ? (ok / (ok + fail) * 100).toFixed(1) + '%' : '—';
   $('#cTps').textContent = busy < 500 ? '—' : tps >= 10 ? fmtK(tps) : tps.toFixed(1);
   $('#cLat').textContent = ok >= 3 ? (lat / ok / 1000).toFixed(1) + 's' : '—';
-  $('#rangeInfo').textContent = viewEnd == null ? rangeLabel() + ' · 跟随现在' : '回看 ' + fmtClock(win.start, true) + ' – ' + fmtClock(win.end, true);
+  $('#rangeInfo').textContent = viewEnd == null ? rangeLabel() + ' · ' + translate('followNow') : translate('lookingBack') + ' ' + fmtClock(win.start, true) + ' – ' + fmtClock(win.end, true);
 }
 function updateFeed() {
   const L = getList(), out = [];
   for (let i = L.length - 1; i >= 0 && out.length < 12; i--) out.push(L[i]);
-  $('#feedN').textContent = recs.size ? recs.size + ' 条已加载' : '';
+  $('#feedN').textContent = recs.size ? recs.size + ' ' + translate('records').trim() : '';
   $('#list').innerHTML = out.map(r => {
     const tk = r.tok;
     return `<li class="row"><div class="r1"><span class="tm mono">${fmtClock(r.t0, true)}</span><b class="cl">${esc(cliName(r.client))}</b><span class="st ${stClass(r)}">${esc(stLabel(r))}</span></div>` +
@@ -1032,7 +1549,8 @@ function render() {
 let chipVer = -1;
 
 /* ---------- controls ---------- */
-$('#bPause').onclick = e => { paused = !paused; e.currentTarget.setAttribute('aria-pressed', paused); e.currentTarget.textContent = paused ? '继续' : '暂停'; if (paused) { flights.clear(); fx.length = 0; } setPill(); kick(); };
+$('#segLang').onclick = e => { const b = e.target.closest('button'); if (!b) return; setLang(b.dataset.lang); };
+$('#bPause').onclick = e => { paused = !paused; e.currentTarget.setAttribute('aria-pressed', paused); e.currentTarget.textContent = translate(paused ? 'resume' : 'pause'); if (paused) { flights.clear(); fx.length = 0; } setPill(); kick(); };
 $('#segSpeed').onclick = e => { const b = e.target.closest('button'); if (!b) return; speedOv = b.dataset.s; LSset('lr-speed', speedOv); kick(); };
 $('#segRange').onclick = e => { const b = e.target.closest('button'); if (!b) return; rangeMs = +b.dataset.r; LSset('lr-range', rangeMs); legendSig = ''; computeVer = -1; chipVer = -1; kick(); };
 $('#segLayout').onclick = e => { const b = e.target.closest('button'); if (!b) return; layoutOv = b.dataset.l; LSset('lr-layout', layoutOv); F.sig = ''; flights.clear(); kick(); };
@@ -1046,11 +1564,11 @@ document.addEventListener('visibilitychange', () => { if (document.hidden) { cle
 let netState = 'connecting', gated = null;
 function setPill() {
   const p = $('#pill'), tx = $('#pillT'); p.className = 'pill';
-  if (DEMO) { tx.textContent = paused ? '演示模式 · 已暂停' : '演示模式'; p.classList.add('idle'); return; }
-  if (gated) { tx.textContent = gated === 'forbidden' ? '拒绝访问' : '需要授权'; p.classList.add('err'); return; }
-  if (netState === 'retry') { tx.textContent = '重连中'; p.classList.add('warn'); return; }
-  if (netState === 'connecting') { tx.textContent = '连接中'; p.classList.add('idle'); return; }
-  tx.textContent = paused ? '已连接 · 已暂停' : '已连接 · 实时';
+  if (DEMO) { tx.textContent = paused ? translate('demoModePaused') : translate('demoMode'); p.classList.add('idle'); return; }
+  if (gated) { tx.textContent = gated === 'forbidden' ? translate('accessDenied') : translate('needKey'); p.classList.add('err'); return; }
+  if (netState === 'retry') { tx.textContent = translate('reconnecting'); p.classList.add('warn'); return; }
+  if (netState === 'connecting') { tx.textContent = translate('connecting'); p.classList.add('idle'); return; }
+  tx.textContent = paused ? translate('connectedPaused') : translate('connected');
 }
 function showGate(kind) {
   gated = kind; clearTimeout(pollTm);
@@ -1085,10 +1603,10 @@ async function call(path, params) {
 function applyConfig(c) { if (c) { cfg = Object.assign({}, DEF_CFG, c); } renderCfg(); }
 function renderCfg() {
   const rows = [
-    ['retention_minutes', '保留时长', Math.round(cfg.retention_s / 60), ' 分钟'], ['max_records', '最大记录数', cfg.max_records, ' 条'],
-    ['active_window_minutes', '流向活跃窗口', Math.round(cfg.active_window_s / 60), ' 分钟'], ['animation_speed', '默认动画速度', cfg.animation_speed, ''],
-    ['reduced_animation', '减少动画', cfg.reduced_animation, ''], ['inflight_tracking', '追踪进行中请求', cfg.inflight_tracking, ''],
-    ['layout', '默认布局', cfg.layout, '']];
+    ['retention_minutes', translate('retentionMinutes'), Math.round(cfg.retention_s / 60), translate('minutes')], ['max_records', translate('maxRecords'), cfg.max_records, translate('records')],
+    ['active_window_minutes', translate('activeWindowMinutes'), Math.round(cfg.active_window_s / 60), translate('minutes')], ['animation_speed', translate('defaultAnimationSpeed'), cfg.animation_speed, ''],
+    ['reduced_animation', translate('reducedAnimation'), cfg.reduced_animation, ''], ['inflight_tracking', translate('inflightTracking'), cfg.inflight_tracking, ''],
+    ['layout', translate('defaultLayout'), cfg.layout, '']];
   $('#cfgg').innerHTML = rows.map(([k, l, v, u]) => `<div title="${esc(k)}"><span>${esc(l)} · <span class="mono">${esc(k)}</span></span><span class="mono">${esc(String(v) + u)}</span></div>`).join('');
   const yv = v => typeof v === 'string' ? '"' + v + '"' : String(v);
   $('#cfgy').textContent = 'plugins:\n  configs:\n    live-routes:\n      enabled: true\n' + rows.map(([k, , v]) => '      ' + k + ': ' + yv(v)).join('\n');
@@ -1114,7 +1632,7 @@ async function applyEvents(ev) {
 function handleErr(e) {
   if (e.staleAuth) { if (managementKey && !gated) pollNow(); return; }
   if (e.status === 403) { dropAuth(); showGate('forbidden'); return; }
-  if (e.status === 401) { const hadKey = managementKey != null; dropAuth(); showGate('key'); if (hadKey) $('#gErr').textContent = '管理密钥无效或已失效，请重新输入'; return; }
+  if (e.status === 401) { const hadKey = managementKey != null; dropAuth(); showGate('key'); if (hadKey) $('#gErr').textContent = translate('invalidKey'); return; }
   netState = 'retry'; setPill(); backoff = Math.min(10000, backoff ? backoff * 2 : 1000);
   clearTimeout(pollTm); pollTm = setTimeout(pollNow, backoff);
 }
@@ -1155,7 +1673,7 @@ $('#gKey').addEventListener('keydown', e => { if (e.key === 'Enter') login(); })
 /* ---------- demo mode (offline simulated contract data) ---------- */
 function startDemo() {
   const DICT = {
-    keys: [{ id: 1, label: '工作机', mask: 'sk-…3f9a', fp: '3f9a1c2e' }, { id: 2, mask: 'sk-…88d0', fp: 'a07b55e1' }, { id: 3, label: 'ci', mask: 'sk-…c41e', fp: 'c41e0b9d' }, { id: 4, label: '开发机', mask: 'sk-…71aa', fp: '71aa5d20' }],
+    keys: [{ id: 1, label: translate('workMachine'), mask: 'sk-…3f9a', fp: '3f9a1c2e' }, { id: 2, mask: 'sk-…88d0', fp: 'a07b55e1' }, { id: 3, label: 'ci', mask: 'sk-…c41e', fp: 'c41e0b9d' }, { id: 4, label: translate('devMachine'), mask: 'sk-…71aa', fp: '71aa5d20' }],
     clients: [{ id: 1, kind: 'claude-code', label: 'Claude Code 2.0.14', key: 1, ip: '192.168.1.20' }, { id: 2, kind: 'codex', label: 'Codex 0.46.0', key: 2, ip: '192.168.1.23' }, { id: 3, kind: 'sdk', label: 'OpenAI SDK', key: 3, ip: '10.0.0.8' }, { id: 4, kind: 'opencode', label: 'OpenCode 0.15', key: 4, ip: '192.168.1.31' }],
     sessions: [{ id: 1, sid: 'claude:7b1e2c4d-5a8f-4e0b-9c1d-2f6a7e8b9c0d', short: '7b1e2c4d', client: 1 }, { id: 2, sid: 'claude:7b1e2c4d-5a8f-4e0b-9c1d-2f6a7e8b9c0d:agent:explore-1', short: 'explore-', parent: 1, client: 1 },
       { id: 3, sid: 'claude:7b1e2c4d-5a8f-4e0b-9c1d-2f6a7e8b9c0d:agent:plan-2', short: 'plan-2', parent: 1, client: 1 }, { id: 4, sid: 'claude:90ac11de-72b0-4c8e-a1f3-55d0c2e4b7a1', short: '90ac11de', client: 1 },
@@ -1211,6 +1729,7 @@ Object.defineProperty(window, '__lr', { value: Object.freeze({ get records() { r
   get firstClient() { const n = F.lists.c[0]; if (!n) return null; const r = cvF.getBoundingClientRect(); return { x: r.left + n.x + n.w / 2, y: r.top + n.y }; } }) });
 (function boot() {
   readColors(); W = Math.max(280, $('#mainp').clientWidth || 800); dpr = Math.min(2, window.devicePixelRatio || 1);
+  applyI18n();
   if (DEMO) { startDemo(); kick(); return; }
   managementKey = loadKey(); if (managementKey) $('#bOut').hidden = false;
   setPill(); kick();
