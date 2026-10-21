@@ -13,7 +13,7 @@ for (const f of fs.readdirSync(OUT)) if (f.endsWith('.png') && (!process.argv.in
 const pwPath = process.env.PLAYWRIGHT_MODULE || path.join(execSync('npm root -g').toString().trim(), 'playwright');
 const { chromium } = createRequire(import.meta.url)(pwPath);
 
-const ALLOWED = new Set(['lr-view', 'lr-layout', 'lr-speed', 'lr-range']);
+const ALLOWED = new Set(['lr-view', 'lr-layout', 'lr-flow-direction', 'lr-speed', 'lr-range']);
 const failures = [], passes = [];
 const check = (ok, msg) => { (ok ? passes : failures).push(msg); console.log((ok ? 'PASS ' : 'FAIL ') + msg); };
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -412,7 +412,7 @@ async function hubHeadingChecks(browser, origin) {
   }
 }
 
-const browser = await chromium.launch();
+const browser = await chromium.launch({ ...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH } : {}) });
 try {
   if (process.argv.includes('--auth-only')) { await authKey(browser); await authForbidden(browser); } else {
   const origin = await startMock(18417, 'key');

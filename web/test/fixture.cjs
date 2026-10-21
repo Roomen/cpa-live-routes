@@ -28,6 +28,7 @@ window.__test = {
       hub:{...hub},W,FH,paths,edges:[...F.edges.values()].map(e=>({key:e.k,g:edgeG(e)})),flights:[...flights.values()]};
   },
   pinTimeline() {viewEnd=now()-60000; rangeMs=30000; LSset('lr-range',rangeMs); kick();},
+  settled() {return [...F.nodes.values()].every(n=>Math.abs(n.y-n.ty)<.5);},
   drawLabels() {const labels=[], previous=X; X=document.createElement('canvas').getContext('2d'); X.fillText=function(text,x,y){labels.push({text,x,y});};try{drawChrome();}finally{X=previous;}return labels;}
 };
 `;

@@ -34,7 +34,7 @@ test('offline browser matrix: directions, session trees, layouts, widths and the
       if(width>=900) await page.locator(`[data-l="${layout}"]`).click();
       else await page.evaluate(l=>localStorage.setItem('lr-layout',l),layout);
       await page.evaluate(mode=>window.__test.load(mode),mode);await direction(d);
-      await page.waitForTimeout(100);
+      await page.waitForFunction(()=>window.__test.settled());
       const s = await snapshot();
       assert.equal(s.layout,width<900?'tabs':layout);
       assert.equal(s.direction,d);
@@ -46,7 +46,7 @@ test('offline browser matrix: directions, session trees, layouts, widths and the
       if(mode==='folded') assert.ok(sessions.some(n=>n.fold?.length===5));
       for(const n of s.nodes) {
         assert.equal(n.hit,n.key,`stale hit box: ${n.key}`);
-        if(n.type!=='r') assert.ok(n.x>=0&&n.x+n.w<=s.W+.01,`off-canvas card ${n.key}`);
+        if(n.type!=='r') {assert.ok(n.x>=0&&n.x+n.w<=s.W+.01,`off-canvas card ${n.key}`);assert.ok(n.y-n.h/2>=0&&n.y+n.h/2<=s.FH+.5,`off-canvas vertical card ${n.key}`);}
       }
       for(const {path:p} of s.paths) {
         assert.ok(p);
