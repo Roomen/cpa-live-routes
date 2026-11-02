@@ -109,14 +109,47 @@ h1{font-size:18px;margin:0;font-weight:650;letter-spacing:.01em}
 .r2 span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
 .r2 .md{flex:none;max-width:60%;color:var(--text-primary)}
 .r3{justify-content:space-between;font-size:11px;color:var(--text-faint);margin-top:1px}
-.cfgp{margin:12px 0 0;padding:12px 16px}
-.cfgp h2{margin:0 0 6px;font-size:13px;font-weight:600}
-.cfgp p{margin:4px 0 10px;color:var(--text-quaternary);font-size:12px;line-height:1.6}
+.cfgp{margin:12px 0 0;padding:16px 20px}
+.cfgp h2{margin:0 0 6px;font-size:14px;font-weight:600}
+.cfgp p{margin:4px 0 14px;color:var(--text-quaternary);font-size:12px;line-height:1.6}
 .cfgp code{font-size:12px}
-.cfgg{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:4px 18px;font-size:12px}
-.cfgg div{display:flex;justify-content:space-between;gap:10px;padding:3px 0;border-bottom:1px dashed var(--border-color);min-width:0}
-.cfgg span:first-child{color:var(--text-quaternary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.cfgp pre{margin:10px 0 0;padding:8px 10px;background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:8px;font-size:12px;overflow-x:auto}
+.cfg-head{display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:12px}
+.cfg-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.cfg-badge{font-size:10px;padding:2px 6px;border-radius:4px;background:var(--bg-card);color:var(--text-faint);border:1px solid var(--border-color);white-space:nowrap;flex-shrink:0;line-height:1.4}
+.cfg-badge.local{background:rgba(15,118,110,0.12);color:var(--info);border-color:rgba(15,118,110,0.3)}
+.cfg-badge.server-base{background:var(--bg-tertiary);color:var(--text-quaternary)}
+.cfg-meta-row{display:flex;align-items:center;gap:8px;font-size:11px;flex-wrap:wrap}
+.cfgg{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;font-size:12px}
+.cfg-card{background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:10px;padding:12px 14px;display:flex;flex-direction:column;gap:8px;transition:border-color .15s,box-shadow .15s}
+.cfg-card:focus-within{border-color:var(--text-faint)}
+.cfg-card.modified{border-color:var(--info);box-shadow:0 0 0 1px var(--info)}
+.cfg-card-head{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.cfg-card-title{font-weight:600;color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cfg-card-title .mono{color:var(--text-faint);font-size:11px;font-weight:400;margin-left:4px}
+.cfg-val-badge{font-size:12px;color:var(--text-primary);font-weight:600}
+.cfg-ctrl-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.cfg-ctrl-row input[type=range]{flex:1;min-width:120px;height:5px;accent-color:var(--info);cursor:pointer;background:var(--border-color);border-radius:999px;outline:none}
+.cfg-ctrl-row input[type=range]:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.cfg-presets{display:flex;gap:4px;flex-wrap:wrap}
+.cfg-preset-btn{font:inherit;font-size:10px;padding:2px 7px;border-radius:6px;border:1px solid var(--border-color);background:var(--bg-card);color:var(--text-faint);cursor:pointer}
+.cfg-preset-btn:hover{color:var(--text-primary);border-color:var(--text-faint)}
+.cfg-hint{font-size:11px;color:var(--text-faint);line-height:1.4}
+.cfg-switch{display:inline-flex;align-items:center;cursor:pointer;user-select:none;position:relative}
+.cfg-switch input{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+.cfg-switch input:focus-visible + .cfg-switch-track{outline:2px solid var(--accent);outline-offset:2px}
+.cfg-switch-track{pointer-events:none;width:36px;height:20px;background:var(--border-color);border-radius:999px;position:relative;transition:background-color .15s;flex-shrink:0}
+.cfg-switch-track::after{content:'';position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;transition:transform .15s}
+.cfg-switch input:checked + .cfg-switch-track{background:var(--info)}
+.cfg-switch input:checked + .cfg-switch-track::after{transform:translateX(16px)}
+.cfg-yaml-box{margin-top:14px}
+.cfg-yaml-head{display:flex;justify-content:space-between;align-items:center;font-size:11px;color:var(--text-faint);margin-bottom:6px}
+.cfg-status{font-size:12px;font-weight:500}
+.cfg-status.good{color:var(--success)}
+.cfg-status.bad{color:var(--error)}
+.cfgp pre{margin:0;padding:10px 12px;background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:8px;font-size:12px;overflow-x:auto}
+@media (prefers-reduced-motion: reduce){
+  .cfg-card, .cfg-switch-track, .cfg-switch-track::after { transition: none !important; }
+}
 .gate{max-width:560px;margin:48px auto;padding:22px 24px;text-align:center}
 .gate h2{margin:0 0 8px;font-size:16px}
 .gate p{margin:6px 0;color:var(--text-quaternary);line-height:1.6}
@@ -164,10 +197,24 @@ h1{font-size:18px;margin:0;font-weight:650;letter-spacing:.01em}
     </div>
   </div>
   <section class="panel cfgp" id="cfgp" hidden>
-    <h2 data-i18n="activePluginConfig">Configuração ativa do plugin</h2>
-    <p data-i18n-html="configReadonly">Somente leitura. Para modificar, edite as chaves em <code class="mono">plugins.configs.live-routes</code> no <code class="mono">config.yaml</code> do CPA. Após salvar, o CPA reenvia a configuração e esta página recarrega automaticamente, sem reiniciar.</p>
+    <div class="cfg-head">
+      <div>
+        <h2 data-i18n="activePluginConfig">Preferências de exibição do plugin</h2>
+        <p data-i18n-html="configReadonly">Preferências visuais e de exibição são salvas localmente no navegador (em tempo real, sem modificar o config.yaml do CPA). Limites de memória do servidor seguem a inicialização do gateway.</p>
+      </div>
+      <div class="cfg-actions">
+        <button class="btn" id="bCopyCfg" type="button"><span id="bCopyCfgT" data-i18n="copyYaml">Copiar YAML</span></button>
+        <button class="btn" id="bResetCfg" type="button" data-i18n="resetConfig">Restaurar padrão</button>
+      </div>
+    </div>
     <div class="cfgg" id="cfgg"></div>
-    <pre class="mono" id="cfgy"></pre>
+    <div class="cfg-yaml-box">
+      <div class="cfg-yaml-head">
+        <span class="mono">plugins.configs.live-routes</span>
+        <span class="cfg-status" id="cfgStatus" aria-live="polite"></span>
+      </div>
+      <pre class="mono" id="cfgy"></pre>
+    </div>
   </section>
   <div class="chips">
     <div class="chip"><small id="lReq" data-i18n="intervalRequests">Requisições no intervalo</small><b class="mono" id="cReq">0</b></div>
@@ -265,19 +312,36 @@ const I18N = {
     recentRequests: 'Requisições recentes',
 
     // Config panel
-    activePluginConfig: 'Configuração ativa do plugin',
-    configReadonly: 'Somente leitura. Para modificar, edite as chaves em <code class="mono">plugins.configs.live-routes</code> no <code class="mono">config.yaml</code> do CPA. Após salvar, o CPA reenvia a configuração e esta página recarrega automaticamente, sem reiniciar.',
+    activePluginConfig: 'Preferências de exibição do plugin',
+    configReadonly: 'Preferências visuais e de exibição são salvas localmente no navegador (em tempo real, sem modificar o <code class="mono">config.yaml</code> do CPA). Limites de memória do servidor seguem a inicialização do gateway.',
     retentionMinutes: 'Retenção',
     maxRecords: 'Máximo de registros',
     activeWindowMinutes: 'Janela ativa do fluxo',
-    defaultAnimationSpeed: 'Velocidade padrão da animação',
+    defaultAnimationSpeed: 'Velocidade da animação',
     reducedAnimation: 'Reduzir animação',
     inflightTracking: 'Rastrear requisições em andamento',
-    defaultLayout: 'Layout padrão',
+    defaultLayout: 'Modo de layout',
+    layoutTabs: 'Abas',
+    layoutSplit: 'Dividido',
+    systemPrefersReducedMotion: 'sistema com redução ativada',
+    serverMemoryHint: 'Limite em RAM gerenciado pelo gateway',
+    serverRecordsHint: 'Buffer circular de memória gerenciado pelo gateway',
+    speedDesc: 'Velocidade dos pacotes animados no canvas',
+    layoutDesc: 'Visualização padrão da página',
+    gatewayDefault: 'Padrão do Gateway',
+    localOverride: 'Personalizado local',
+    enabled: 'Ativado',
+    disabled: 'Desativado',
     minutes: ' min',
     records: ' reg',
+    copyYaml: 'Copiar YAML',
+    copyYamlCopied: '✓ Copiado!',
+    resetConfig: 'Restaurar padrão',
+    resetDone: '✓ Preferências locais redefinidas',
+    configModified: '✓ Preferências locais ativas (CPA inalterado)',
+    reducedAnimationDesc: 'Desativar pontos voadores; exibir apenas larguras e contadores',
+    inflightTrackingDesc: 'Observação de requisições em andamento (definida pelo gateway)',
 
-    // Auth gate
     accessDenied: 'Acesso negado',
     accessDeniedMsg: 'A interface de gerenciamento do CPA recusou o acesso. Configure a chave de gerenciamento no CPA (remote-management.secret-key ou variável MANAGEMENT_PASSWORD); acesso local também exige configuração. Outras causas possíveis: configurações de acesso remoto não permitem, ou bloqueio temporário por falhas excessivas — 5 falhas consecutivas do mesmo IP resultam em bloqueio de 30 minutos. Verifique a configuração ou aguarde o término do bloqueio.',
     retryAuth: 'Inserir chave novamente',
@@ -415,17 +479,35 @@ const I18N = {
 
     recentRequests: 'Recent requests',
 
-    activePluginConfig: 'Active plugin configuration',
-    configReadonly: 'Read-only. To modify, edit keys under <code class="mono">plugins.configs.live-routes</code> in CPA\'s <code class="mono">config.yaml</code>. After saving, CPA re-pushes config and this page auto-refreshes without restart.',
+    activePluginConfig: 'Plugin display preferences',
+    configReadonly: 'Visual and display preferences take effect locally in real time in your browser (without modifying CPA\'s <code class="mono">config.yaml</code>). Server-side physical memory limits follow gateway defaults.',
     retentionMinutes: 'Retention',
     maxRecords: 'Max records',
     activeWindowMinutes: 'Flow active window',
-    defaultAnimationSpeed: 'Default animation speed',
+    defaultAnimationSpeed: 'Animation speed',
     reducedAnimation: 'Reduced animation',
     inflightTracking: 'Track in-flight requests',
-    defaultLayout: 'Default layout',
+    defaultLayout: 'Layout mode',
+    layoutTabs: 'Tabs',
+    layoutSplit: 'Split',
+    systemPrefersReducedMotion: 'system reduced motion active',
+    serverMemoryHint: 'RAM history limit anchored by gateway',
+    serverRecordsHint: 'In-memory ring buffer anchored by gateway',
+    speedDesc: 'Speed of moving packets on the live canvas',
+    layoutDesc: 'Default dashboard presentation',
+    gatewayDefault: 'Gateway default',
+    localOverride: 'Local override',
+    enabled: 'Enabled',
+    disabled: 'Disabled',
     minutes: ' min',
     records: ' records',
+    copyYaml: 'Copy YAML',
+    copyYamlCopied: '✓ Copied!',
+    resetConfig: 'Reset to defaults',
+    resetDone: '✓ Local preferences cleared',
+    configModified: '✓ Local preferences active (CPA untouched)',
+    reducedAnimationDesc: 'Disable flying dots; show link widths and counters only',
+    inflightTrackingDesc: 'In-flight request observation (gateway-managed)',
 
     accessDenied: 'Access denied',
     accessDeniedMsg: 'CPA management interface denied access. Configure the management key in CPA (remote-management.secret-key or MANAGEMENT_PASSWORD env var); local access also requires configuration. Other possible causes: remote management access settings disallow, or temporary ban from excessive failures — 5 consecutive auth failures from the same IP result in a 30-minute ban. Check your configuration or wait for the ban to expire.',
@@ -559,17 +641,35 @@ const I18N = {
 
     recentRequests: '最近请求',
 
-    activePluginConfig: '当前生效的插件配置',
-    configReadonly: '这里只读。修改请编辑 CPA 的 <code class="mono">config.yaml</code> 中 <code class="mono">plugins.configs.live-routes</code> 下的键，保存后 CPA 会重新下发配置，本页自动刷新，无需重启。',
+    activePluginConfig: '插件偏好与配置面板',
+    configReadonly: '视觉与交互偏好在浏览器本地即时生效并持久化（完全不改动 CPA 的 <code class="mono">config.yaml</code> 主配置文件）。服务端物理内存上限以网关底座为准。',
     retentionMinutes: '保留时长',
     maxRecords: '最大记录数',
     activeWindowMinutes: '流向活跃窗口',
-    defaultAnimationSpeed: '默认动画速度',
+    defaultAnimationSpeed: '动画速度',
     reducedAnimation: '减少动画',
     inflightTracking: '追踪进行中请求',
-    defaultLayout: '默认布局',
+    defaultLayout: '布局模式',
+    layoutTabs: '标签页',
+    layoutSplit: '双栏并列',
+    systemPrefersReducedMotion: '系统已启用减弱动效',
+    serverMemoryHint: '网关物理内存保留基准',
+    serverRecordsHint: '网关内存环形缓冲区容量',
+    speedDesc: '流向画布中数据粒子的流动速率',
+    layoutDesc: '仪表板视图的呈现模式',
+    gatewayDefault: '网关底座',
+    localOverride: '本地自定义',
+    enabled: '已启用',
+    disabled: '已禁用',
     minutes: ' 分钟',
     records: ' 条',
+    copyYaml: '复制 YAML',
+    copyYamlCopied: '✓ 已复制',
+    resetConfig: '恢复默认',
+    resetDone: '✓ 已清除本地自定义偏好',
+    configModified: '✓ 本地偏好生效中（零改动 CPA 配置）',
+    reducedAnimationDesc: '关闭飞行粒子，仅显示线宽与计数',
+    inflightTrackingDesc: '在途请求跟踪观察（由网关采集服务管理）',
 
     accessDenied: '无法访问',
     accessDeniedMsg: 'CPA 管理接口拒绝访问。请先在 CPA 配置管理密钥（remote-management.secret-key 或环境变量 MANAGEMENT_PASSWORD），本机访问也需要配置。其他可能原因包括远程管理访问设置不允许，或失败次数过多被暂时封禁：同一 IP 连续 5 次认证失败会被封禁 30 分钟。请检查配置，或等待封禁到期后重试。',
@@ -756,17 +856,63 @@ let cfg = Object.assign({}, DEF_CFG);
 let rangeMs = +LSget('lr-range'); if (![30000, 120000, 600000].includes(rangeMs)) rangeMs = 120000;
 let speedOv = LSget('lr-speed'); if (!['0.5', '1', '2'].includes(speedOv)) speedOv = null;
 let layoutOv = LSget('lr-layout'); if (layoutOv !== 'tabs' && layoutOv !== 'split') layoutOv = null;
+let reducedOv = LSget('lr-reduced'); if (reducedOv !== 'true' && reducedOv !== 'false') reducedOv = null;
+let activeWindowOv = +LSget('lr-active-window'); if (!activeWindowOv || activeWindowOv < 1 || activeWindowOv > 60) activeWindowOv = null;
 // A browser-only presentation preference, independent of tabs/split and CPA config.
 let flowDirection = LSget('lr-flow-direction') === 'ltr' ? 'ltr' : 'rtl';
 const leftToRight = () => flowDirection === 'ltr';
 let view = LSget('lr-view') === 'time' ? 'time' : 'flow';
 let paused = false, viewEnd = null;
 const RMq = matchMedia('(prefers-reduced-motion: reduce)');
-const reduced = () => !!cfg.reduced_animation || RMq.matches;
+const effReducedConfig = () => reducedOv !== null ? reducedOv === 'true' : Boolean(cfg.reduced_animation);
+const reduced = () => effReducedConfig() || RMq.matches;
 const speedVal = () => { const v = parseFloat(speedOv || cfg.animation_speed); return v === 0.5 || v === 2 ? v : 1; };
 const effLayout = () => innerWidth < 900 ? 'tabs' : (layoutOv || cfg.layout) === 'split' ? 'split' : 'tabs';
+const maxRetentionM = () => Math.max(1, Math.round(cfg.retention_s / 60));
+const effActiveWindowM = () => Math.min(activeWindowOv || Math.round(cfg.active_window_s / 60), maxRetentionM());
+const effActiveWindowS = () => effActiveWindowM() * 60;
 const flowVisible = () => effLayout() === 'split' || view === 'flow';
 const tlVisible = () => effLayout() === 'split' || view === 'time';
+
+function setSpeed(val) {
+  const s = String(val).replace('x', '');
+  speedOv = (s === '0.5' || s === '1' || s === '2') ? s : null;
+  if (speedOv !== null && speedOv === (cfg.animation_speed || '1x').replace('x', '')) speedOv = null;
+  if (speedOv !== null) LSset('lr-speed', speedOv);
+  else LSdel('lr-speed');
+  syncSpeedUI();
+  updateYamlPreview();
+  kick();
+}
+function syncSpeedUI() {
+  const cur = speedVal();
+  const sStr = cur === 0.5 ? '0.5' : cur === 2 ? '2' : '1';
+  const xStr = sStr + 'x';
+  const seg1 = $('#segSpeed');
+  if (seg1) seg1.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', b.dataset.s === sStr));
+  const seg2 = $('#segCfgSpeed');
+  if (seg2) seg2.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', b.dataset.val === xStr));
+  const badge = $('#v_animation_speed');
+  if (badge) badge.textContent = xStr;
+}
+
+function setLayout(val) {
+  layoutOv = (val === 'split' || val === 'tabs') ? val : null;
+  if (layoutOv !== null && layoutOv === (cfg.layout || 'tabs')) layoutOv = null;
+  if (layoutOv !== null) LSset('lr-layout', layoutOv);
+  else LSdel('lr-layout');
+  syncLayoutUI();
+  F.sig = ''; flights.clear();
+  updateYamlPreview();
+  kick();
+}
+function syncLayoutUI() {
+  const cur = layoutOv || cfg.layout || 'tabs';
+  const seg1 = $('#segLayout');
+  if (seg1) seg1.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', b.dataset.l === cur));
+  const seg2 = $('#segCfgLayout');
+  if (seg2) seg2.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', b.dataset.val === cur));
+}
 
 /* ---------- colors ---------- */
 let C = {};
@@ -883,13 +1029,13 @@ let F = { nodes: new Map(), edges: new Map(), paths: new Map(), lists: { c: [], 
 let hub = { x: 0, y: 0, w: 0, h: 0, ry0: 0, rh: 28, hdr: 40, foot: 24 };
 let lastCompute = 0, computeVer = -1, nodeAnim = false, hover = null, rel = null, G = null, relSig = '', sKey = new Map();
 /* the host never reports a closed session: last activity is now while a request is in flight, else its newest t1||t0; sub-agents close after KID_MS idle, roots after rootTtl() */
-const rootTtl = () => Math.max(cfg.active_window_s * 1000, Math.min(1800000, cfg.retention_s * 1000));
+const rootTtl = () => Math.max(effActiveWindowS() * 1000, Math.min(1800000, cfg.retention_s * 1000));
 /* Sessions are visual groupings, not network hops. Keep the original RTL order;
    LTR groups a client's expanded sessions between its card and the CPA model. */
 const pathKeys = r => { const c = r.client || 0, sk = r.session && expanded.has(c) && sKey.get(r.session), k = sk ? (leftToRight() ? ['c' + c, sk] : [sk, 'c' + c]) : ['c' + c]; k.push('r' + (r.rule || 0)); if (r.exit) k.push('x' + r.exit); return k; };
 
 function computeFlow(t) {
-  const winMs = cfg.active_window_s * 1000, rg = rangeMs, L = getList(), H = rootTtl();
+  const winMs = effActiveWindowS() * 1000, rg = rangeMs, L = getList(), H = rootTtl();
   const found = new Map(), edges = new Map(), paths = new Map();
   /* liveness pass: per session last activity and client, per anchor (root session, or a client's sessionless traffic) its newest record */
   const act = new Map(), scli = new Map(), newest = new Map(), cutH = t - H - 120000;
@@ -1325,7 +1471,7 @@ function buildLanes(t, win) {
   }
   /* sticky lanes: every exit with a request within max(range, active window) of now, plus anything in flight, stays listed (idle) even when the visible window is empty */
   const mk = k => { let ln = lanes.get(k); if (!ln) lanes.set(k, ln = { key: k, rows: 1, spark: new Array(24).fill(0), n60: 0, t429: 0, last: 0 }); return ln; };
-  for (let i = lowerBound(L, t - Math.max(rangeMs, cfg.active_window_s * 1000)); i < L.length; i++) { const r = L[i], ln = mk(r.exit || 0); ln.last = Math.max(ln.last, r.t0); }
+  for (let i = lowerBound(L, t - Math.max(rangeMs, effActiveWindowS() * 1000)); i < L.length; i++) { const r = L[i], ln = mk(r.exit || 0); ln.last = Math.max(ln.last, r.t0); }
   for (const id of inflight) { const r = recs.get(id); if (r) mk(r.exit || 0); }
   for (let i = lowerBound(L, t - 360000); i < L.length; i++) {
     const r = L[i], ln = lanes.get(r.exit || 0); if (!ln) continue;
@@ -1578,9 +1724,9 @@ let chipVer = -1;
 /* ---------- controls ---------- */
 $('#segLang').onclick = e => { const b = e.target.closest('button'); if (!b) return; setLang(b.dataset.lang); };
 $('#bPause').onclick = e => { paused = !paused; e.currentTarget.setAttribute('aria-pressed', paused); e.currentTarget.textContent = translate(paused ? 'resume' : 'pause'); if (paused) { flights.clear(); fx.length = 0; } setPill(); kick(); };
-$('#segSpeed').onclick = e => { const b = e.target.closest('button'); if (!b) return; speedOv = b.dataset.s; LSset('lr-speed', speedOv); kick(); };
+$('#segSpeed').onclick = e => { const b = e.target.closest('button'); if (!b) return; setSpeed(b.dataset.s); };
 $('#segRange').onclick = e => { const b = e.target.closest('button'); if (!b) return; rangeMs = +b.dataset.r; LSset('lr-range', rangeMs); legendSig = ''; computeVer = -1; chipVer = -1; kick(); };
-$('#segLayout').onclick = e => { const b = e.target.closest('button'); if (!b) return; layoutOv = b.dataset.l; LSset('lr-layout', layoutOv); F.sig = ''; flights.clear(); kick(); };
+$('#segLayout').onclick = e => { const b = e.target.closest('button'); if (!b) return; setLayout(b.dataset.l); };
 function updateDirectionLabel() {
   const key = leftToRight() ? 'flowCanvasLtrLabel' : 'flowCanvasRtlLabel';
   cvF.dataset.i18nAria = key;
@@ -1639,17 +1785,259 @@ async function call(path, params) {
   if (res.ok) { let body; try { body = await res.json(); } catch (e) { checkAuth(); throw e; } checkAuth(); return body; }
   const err = new Error('http ' + res.status); err.status = res.status; throw err;
 }
-function applyConfig(c) { if (c) { cfg = Object.assign({}, DEF_CFG, c); } renderCfg(); }
-function renderCfg() {
-  const rows = [
-    ['retention_minutes', translate('retentionMinutes'), Math.round(cfg.retention_s / 60), translate('minutes')], ['max_records', translate('maxRecords'), cfg.max_records, translate('records')],
-    ['active_window_minutes', translate('activeWindowMinutes'), Math.round(cfg.active_window_s / 60), translate('minutes')], ['animation_speed', translate('defaultAnimationSpeed'), cfg.animation_speed, ''],
-    ['reduced_animation', translate('reducedAnimation'), cfg.reduced_animation, ''], ['inflight_tracking', translate('inflightTracking'), cfg.inflight_tracking, ''],
-    ['layout', translate('defaultLayout'), cfg.layout, '']];
-  $('#cfgg').innerHTML = rows.map(([k, l, v, u]) => `<div title="${esc(k)}"><span>${esc(l)} · <span class="mono">${esc(k)}</span></span><span class="mono">${esc(String(v) + u)}</span></div>`).join('');
-  const yv = v => typeof v === 'string' ? '"' + v + '"' : String(v);
-  $('#cfgy').textContent = 'plugins:\n  configs:\n    live-routes:\n      enabled: true\n' + rows.map(([k, , v]) => '      ' + k + ': ' + yv(v)).join('\n');
+let draftCfg = null;
+
+function getGatewayConfigMap() {
+  const retM = maxRetentionM();
+  return {
+    retention_minutes: retM,
+    max_records: cfg.max_records,
+    active_window_minutes: Math.min(Math.round(cfg.active_window_s / 60), retM),
+    animation_speed: cfg.animation_speed,
+    reduced_animation: Boolean(cfg.reduced_animation),
+    inflight_tracking: Boolean(cfg.inflight_tracking),
+    layout: cfg.layout
+  };
 }
+
+function getEffectiveConfigMap() {
+  return {
+    retention_minutes: maxRetentionM(),
+    max_records: cfg.max_records,
+    active_window_minutes: effActiveWindowM(),
+    animation_speed: speedOv ? (speedOv === '1' ? '1x' : speedOv + 'x') : cfg.animation_speed,
+    reduced_animation: effReducedConfig(),
+    inflight_tracking: Boolean(cfg.inflight_tracking),
+    layout: layoutOv || cfg.layout
+  };
+}
+
+function updateYamlPreview() {
+  const d = getEffectiveConfigMap();
+  const gw = getGatewayConfigMap();
+  const yv = v => typeof v === 'string' ? '"' + v + '"' : String(v);
+  const rows = [
+    ['retention_minutes', d.retention_minutes],
+    ['max_records', d.max_records],
+    ['active_window_minutes', d.active_window_minutes],
+    ['animation_speed', d.animation_speed],
+    ['reduced_animation', d.reduced_animation],
+    ['inflight_tracking', d.inflight_tracking],
+    ['layout', d.layout]
+  ];
+  $('#cfgy').textContent = 'plugins:\n  configs:\n    live-routes:\n      enabled: true\n' + rows.map(([k, v]) => '      ' + k + ': ' + yv(v)).join('\n');
+
+  let localOverridesCount = 0;
+  for (const k in gw) {
+    const card = $('#card_' + k);
+    const isLocal = d[k] !== gw[k];
+    if (card) {
+      card.classList.toggle('modified', isLocal);
+      const b = card.querySelector('.cfg-badge');
+      if (b && !b.classList.contains('server-base')) {
+        b.className = isLocal ? 'cfg-badge local' : 'cfg-badge';
+        b.textContent = isLocal ? translate('localOverride') : translate('gatewayDefault');
+      }
+    }
+    if (isLocal) localOverridesCount++;
+  }
+  const status = $('#cfgStatus');
+  if (status) {
+    if (localOverridesCount > 0) {
+      status.className = 'cfg-status good';
+      status.textContent = translate('configModified');
+    } else {
+      status.className = 'cfg-status';
+      status.textContent = '';
+    }
+  }
+}
+
+function applyConfig(c) {
+  if (c) { cfg = Object.assign({}, DEF_CFG, c); }
+  renderCfg();
+}
+
+function renderCfg() {
+  const d = getEffectiveConfigMap();
+  const gw = getGatewayConfigMap();
+  const maxActive = maxRetentionM();
+
+  const presets = [5, 10, 20, 30, 60].filter(v => v <= maxActive);
+  if (!presets.includes(maxActive) && maxActive < 60) presets.push(maxActive);
+  presets.sort((a, b) => a - b);
+
+  const reducedHint = RMq.matches && reducedOv === null
+    ? esc(translate('reducedAnimationDesc')) + ' (' + esc(translate('systemPrefersReducedMotion')) + ')'
+    : esc(translate('reducedAnimationDesc'));
+
+  $('#cfgg').innerHTML = `
+    <div class="cfg-card" id="card_retention_minutes" title="retention_minutes">
+      <div class="cfg-card-head">
+        <span class="cfg-card-title">${esc(translate('retentionMinutes'))} · <span class="mono">retention_minutes</span></span>
+        <span class="cfg-badge server-base">${esc(translate('gatewayDefault'))}</span>
+      </div>
+      <div class="cfg-meta-row">
+        <span class="cfg-val-badge mono" id="v_retention_minutes">${d.retention_minutes}${translate('minutes')}</span>
+        <span class="cfg-hint">${esc(translate('serverMemoryHint'))}</span>
+      </div>
+    </div>
+
+    <div class="cfg-card" id="card_max_records" title="max_records">
+      <div class="cfg-card-head">
+        <span class="cfg-card-title">${esc(translate('maxRecords'))} · <span class="mono">max_records</span></span>
+        <span class="cfg-badge server-base">${esc(translate('gatewayDefault'))}</span>
+      </div>
+      <div class="cfg-meta-row">
+        <span class="cfg-val-badge mono" id="v_max_records">${d.max_records}${translate('records')}</span>
+        <span class="cfg-hint">${esc(translate('serverRecordsHint'))}</span>
+      </div>
+    </div>
+
+    <div class="cfg-card" id="card_inflight_tracking" title="inflight_tracking">
+      <div class="cfg-card-head">
+        <span class="cfg-card-title">${esc(translate('inflightTracking'))} · <span class="mono">inflight_tracking</span></span>
+        <span class="cfg-badge server-base">${esc(translate('gatewayDefault'))}</span>
+      </div>
+      <div class="cfg-meta-row">
+        <span class="cfg-val-badge mono">${d.inflight_tracking ? esc(translate('enabled')) : esc(translate('disabled'))}</span>
+        <span class="cfg-hint">${esc(translate('inflightTrackingDesc'))}</span>
+      </div>
+    </div>
+
+    <div class="cfg-card" id="card_active_window_minutes" title="active_window_minutes">
+      <div class="cfg-card-head">
+        <span class="cfg-card-title">${esc(translate('activeWindowMinutes'))} · <span class="mono">active_window_minutes</span></span>
+        <span class="cfg-badge ${d.active_window_minutes !== gw.active_window_minutes ? 'local' : ''}">${d.active_window_minutes !== gw.active_window_minutes ? esc(translate('localOverride')) : esc(translate('gatewayDefault'))}</span>
+      </div>
+      <div class="cfg-ctrl-row">
+        <input type="range" min="1" max="${maxActive}" value="${d.active_window_minutes}" id="rng_active_window_minutes" aria-label="${esc(translate('activeWindowMinutes'))}">
+        <span class="cfg-val-badge mono" id="v_active_window_minutes">${d.active_window_minutes}${translate('minutes')}</span>
+      </div>
+      <div class="cfg-presets">
+        ${presets.map(v => `<button type="button" class="cfg-preset-btn" data-f="active_window_minutes" data-v="${v}">${v}m</button>`).join('')}
+      </div>
+    </div>
+
+    <div class="cfg-card" id="card_animation_speed" title="animation_speed">
+      <div class="cfg-card-head">
+        <span class="cfg-card-title">${esc(translate('defaultAnimationSpeed'))} · <span class="mono">animation_speed</span></span>
+        <span class="cfg-badge ${d.animation_speed !== gw.animation_speed ? 'local' : ''}">${d.animation_speed !== gw.animation_speed ? esc(translate('localOverride')) : esc(translate('gatewayDefault'))}</span>
+      </div>
+      <div class="cfg-ctrl-row">
+        <div class="seg" id="segCfgSpeed" role="group" aria-label="${esc(translate('defaultAnimationSpeed'))}">
+          <button type="button" data-val="0.5x" aria-pressed="${d.animation_speed === '0.5x'}">0.5x</button>
+          <button type="button" data-val="1x" aria-pressed="${d.animation_speed === '1x'}">1x</button>
+          <button type="button" data-val="2x" aria-pressed="${d.animation_speed === '2x'}">2x</button>
+        </div>
+        <span class="cfg-val-badge mono" id="v_animation_speed">${d.animation_speed}</span>
+      </div>
+      <span class="cfg-hint">${esc(translate('speedDesc'))}</span>
+    </div>
+
+    <div class="cfg-card" id="card_reduced_animation" title="reduced_animation">
+      <div class="cfg-card-head">
+        <span class="cfg-card-title">${esc(translate('reducedAnimation'))} · <span class="mono">reduced_animation</span></span>
+        <label class="cfg-switch">
+          <input type="checkbox" id="sw_reduced_animation" aria-label="${esc(translate('reducedAnimation'))}" ${d.reduced_animation ? 'checked' : ''}>
+          <span class="cfg-switch-track"></span>
+        </label>
+      </div>
+      <span class="cfg-hint">${reducedHint}</span>
+    </div>
+
+    <div class="cfg-card" id="card_layout" title="layout">
+      <div class="cfg-card-head">
+        <span class="cfg-card-title">${esc(translate('defaultLayout'))} · <span class="mono">layout</span></span>
+        <span class="cfg-badge ${d.layout !== gw.layout ? 'local' : ''}">${d.layout !== gw.layout ? esc(translate('localOverride')) : esc(translate('gatewayDefault'))}</span>
+      </div>
+      <div class="cfg-ctrl-row">
+        <div class="seg" id="segCfgLayout" role="group" aria-label="${esc(translate('defaultLayout'))}">
+          <button type="button" data-val="tabs" aria-pressed="${d.layout === 'tabs'}">${esc(translate('layoutTabs'))}</button>
+          <button type="button" data-val="split" aria-pressed="${d.layout === 'split'}">${esc(translate('layoutSplit'))}</button>
+        </div>
+      </div>
+      <span class="cfg-hint">${esc(translate('layoutDesc'))}</span>
+    </div>
+  `;
+
+  const rngWin = $('#rng_active_window_minutes');
+  if (rngWin) {
+    const applyWin = val => {
+      val = Math.max(1, Math.min(maxActive, parseInt(val, 10) || 10));
+      rngWin.value = val;
+      const v = $('#v_active_window_minutes'); if (v) v.textContent = val + translate('minutes');
+      activeWindowOv = val;
+      LSset('lr-active-window', val);
+      F.sig = ''; computeVer = -1; chipVer = -1; kick();
+      updateYamlPreview();
+    };
+    rngWin.oninput = e => applyWin(e.target.value);
+    $('#card_active_window_minutes').querySelectorAll('.cfg-preset-btn').forEach(btn => {
+      btn.onclick = () => applyWin(btn.dataset.v);
+    });
+  }
+
+  const speedSeg = $('#segCfgSpeed');
+  if (speedSeg) {
+    speedSeg.querySelectorAll('button').forEach(b => {
+      b.onclick = () => setSpeed(b.dataset.val);
+    });
+  }
+
+  const swRed = $('#sw_reduced_animation');
+  if (swRed) {
+    swRed.onchange = e => {
+      reducedOv = String(e.target.checked);
+      LSset('lr-reduced', reducedOv);
+      kick();
+      updateYamlPreview();
+    };
+  }
+
+  const laySeg = $('#segCfgLayout');
+  if (laySeg) {
+    laySeg.querySelectorAll('button').forEach(b => {
+      b.onclick = () => setLayout(b.dataset.val);
+    });
+  }
+
+  updateYamlPreview();
+}
+
+$('#bCopyCfg').onclick = async () => {
+  const btnT = $('#bCopyCfgT');
+  const yaml = $('#cfgy').textContent;
+  try {
+    await navigator.clipboard.writeText(yaml);
+    btnT.textContent = translate('copyYamlCopied');
+    setTimeout(() => { btnT.textContent = translate('copyYaml'); }, 2000);
+  } catch (err) {
+    const range = document.createRange();
+    range.selectNodeContents($('#cfgy'));
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+  }
+};
+
+$('#bResetCfg').onclick = () => {
+  LSdel('lr-speed'); speedOv = null;
+  LSdel('lr-reduced'); reducedOv = null;
+  LSdel('lr-layout'); layoutOv = null;
+  LSdel('lr-active-window'); activeWindowOv = null;
+  syncSpeedUI();
+  syncLayoutUI();
+  renderCfg();
+  F.sig = ''; flights.clear(); kick();
+  const status = $('#cfgStatus');
+  if (status) {
+    status.className = 'cfg-status good';
+    status.textContent = translate('resetDone');
+    setTimeout(() => { if (status && status.textContent === translate('resetDone')) status.textContent = ''; }, 2500);
+  }
+};
+
 $('#bCfg').onclick = e => { const p = $('#cfgp'), on = p.hidden; p.hidden = !on; e.currentTarget.setAttribute('aria-pressed', on); if (on) renderCfg(); };
 async function loadSnapshot() {
   const s = await call('snapshot'); skew = s.now - Date.now(); cursor = s.cursor; applyConfig(s.config);
