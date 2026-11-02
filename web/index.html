@@ -335,6 +335,7 @@ const I18N = {
     minutes: ' min',
     records: ' reg',
     copyYaml: 'Copiar YAML',
+    yamlPartial: 'Trecho parcial: mescle estas chaves no bloco existente; chaves não listadas (como api_key_labels e priority) não aparecem aqui e devem ser mantidas.',
     copyYamlCopied: '✓ Copiado!',
     resetConfig: 'Restaurar padrão',
     resetDone: '✓ Preferências locais redefinidas',
@@ -502,6 +503,7 @@ const I18N = {
     minutes: ' min',
     records: ' records',
     copyYaml: 'Copy YAML',
+    yamlPartial: 'Partial snippet: merge these keys into your existing block; keys not listed (such as api_key_labels and priority) are not shown here and must be kept.',
     copyYamlCopied: '✓ Copied!',
     resetConfig: 'Reset to defaults',
     resetDone: '✓ Local preferences cleared',
@@ -664,6 +666,7 @@ const I18N = {
     minutes: ' 分钟',
     records: ' 条',
     copyYaml: '复制 YAML',
+    yamlPartial: '部分片段：请把这些键合并进现有配置块；未列出的键（如 api_key_labels、priority）不在此显示，需保留原值。',
     copyYamlCopied: '✓ 已复制',
     resetConfig: '恢复默认',
     resetDone: '✓ 已清除本地自定义偏好',
@@ -1785,8 +1788,6 @@ async function call(path, params) {
   if (res.ok) { let body; try { body = await res.json(); } catch (e) { checkAuth(); throw e; } checkAuth(); return body; }
   const err = new Error('http ' + res.status); err.status = res.status; throw err;
 }
-let draftCfg = null;
-
 function getGatewayConfigMap() {
   const retM = maxRetentionM();
   return {
@@ -1825,7 +1826,7 @@ function updateYamlPreview() {
     ['inflight_tracking', d.inflight_tracking],
     ['layout', d.layout]
   ];
-  $('#cfgy').textContent = 'plugins:\n  configs:\n    live-routes:\n      enabled: true\n' + rows.map(([k, v]) => '      ' + k + ': ' + yv(v)).join('\n');
+  $('#cfgy').textContent = '# ' + translate('yamlPartial') + '\nplugins:\n  configs:\n    live-routes:\n      enabled: true\n' + rows.map(([k, v]) => '      ' + k + ': ' + yv(v)).join('\n');
 
   let localOverridesCount = 0;
   for (const k in gw) {
@@ -1915,7 +1916,7 @@ function renderCfg() {
         <span class="cfg-val-badge mono" id="v_active_window_minutes">${d.active_window_minutes}${translate('minutes')}</span>
       </div>
       <div class="cfg-presets">
-        ${presets.map(v => `<button type="button" class="cfg-preset-btn" data-f="active_window_minutes" data-v="${v}">${v}m</button>`).join('')}
+        ${presets.map(v => `<button type="button" class="cfg-preset-btn" data-f="active_window_minutes" data-v="${v}">${v}${esc(translate('minutes'))}</button>`).join('')}
       </div>
     </div>
 

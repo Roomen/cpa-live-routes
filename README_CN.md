@@ -94,7 +94,7 @@ Expand-Archive $zip -DestinationPath plugins\windows\amd64 -Force   # live-route
 
 ## 配置
 
-所有服务端选项位于 `plugins.configs.live-routes` 下。页面上的 **配置** 按钮打开交互式可视化偏好抽屉，支持实时 YAML 生成与复制；界面视觉偏好支持在本地实时调整，服务端物理参数（`retention_minutes`、`max_records`、`inflight_tracking`）以 CPA 网关 `config.yaml` 底座为准。`enabled` 与 `priority` 由 CPA 自身处理。建议设置 `priority: -100`，让本观察器在其他拦截器之后运行。
+所有服务端选项位于 `plugins.configs.live-routes` 下。页面上的 **配置** 按钮打开交互式可视化偏好抽屉，支持实时 YAML 生成与复制。生成的 YAML 只是部分片段：请合并进现有配置块，未列出的键（如 `api_key_labels`、`priority`）需保留原值；界面视觉偏好支持在本地实时调整，服务端物理参数（`retention_minutes`、`max_records`、`inflight_tracking`）以 CPA 网关 `config.yaml` 底座为准。`enabled` 与 `priority` 由 CPA 自身处理。建议设置 `priority: -100`，让本观察器在其他拦截器之后运行。
 
 | 配置项 | 默认值 | 取值范围 | 说明 |
 | --- | --- | --- | --- |
