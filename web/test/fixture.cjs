@@ -27,6 +27,7 @@ window.__test = {
       nodes:[...F.nodes.values()].map(n=>({key:n.key,type:n.type,x:n.x,y:n.y,w:n.w,h:n.h,fold:n.fold,hit:hitFlow(n.type==='r'?hub.x+hub.w/2:n.x+n.w/2,n.y)?.k})),
       hub:{...hub},W,FH,paths,edges:[...F.edges.values()].map(e=>({key:e.k,g:edgeG(e)})),flights:[...flights.values()]};
   },
+  config(c) {applyConfig(c);},
   pinTimeline() {viewEnd=now()-60000; rangeMs=30000; LSset('lr-range',rangeMs); kick();},
   settled() {return [...F.nodes.values()].every(n=>Math.abs(n.y-n.ty)<.5);},
   drawLabels() {const labels=[], previous=X; X=document.createElement('canvas').getContext('2d'); X.fillText=function(text,x,y){labels.push({text,x,y});};try{drawChrome();}finally{X=previous;}return labels;}

@@ -118,8 +118,10 @@ test('offline browser matrix: directions, session trees, layouts, widths and the
     assert.equal(await page.locator('#segCfgSpeed button[data-val="0.5x"]').getAttribute('aria-pressed'), 'true');
     assert.ok(await page.locator('#cfgy').textContent().then(t => t.includes('animation_speed: "0.5x"')));
 
-    // Layout sync: panel -> toolbar
+    // Layout sync: panel -> toolbar (split was stored before the reload above)
+    assert.equal(await page.locator('#segCfgLayout button[data-val="split"]').getAttribute('aria-pressed'), 'true');
     await page.click('#segCfgLayout button[data-val="tabs"]');
+    assert.equal((await snapshot()).layout, 'tabs');
     assert.equal(await page.locator('#segLayout button[data-l="tabs"]').getAttribute('aria-pressed'), 'true');
     assert.ok(await page.locator('#cfgy').textContent().then(t => t.includes('layout: "tabs"')));
 
@@ -146,6 +148,29 @@ test('offline browser matrix: directions, session trees, layouts, widths and the
     assert.equal(await page.evaluate(() => localStorage.getItem('lr-reduced')), null);
     assert.equal(await page.evaluate(() => localStorage.getItem('lr-active-window')), null);
     assert.ok(await page.locator('#cfgy').textContent().then(t => t.includes('animation_speed: "1x"')));
+    assert.ok(await page.locator('#cfgy').textContent().then(t => t.startsWith('# ')), 'yaml is marked as a partial snippet');
+
+    // Active window never exceeds retention, even with a larger stored override
+    const yamlNum = async key => +(await page.locator('#cfgy').textContent()).match(new RegExp(key + ': (\\d+)'))[1];
+    await page.evaluate(() => window.__test.config({ retention_s: 3600 }));
+    await page.click('#card_active_window_minutes button[data-v="60"]');
+    assert.equal(await yamlNum('active_window_minutes'), 60);
+    await page.evaluate(() => window.__test.config({ retention_s: 1200 }));
+    assert.equal(await page.locator('#rng_active_window_minutes').getAttribute('max'), '20');
+    assert.equal(await yamlNum('retention_minutes'), 20);
+    assert.equal(await yamlNum('active_window_minutes'), 20);
+    assert.deepEqual(await page.locator('#card_active_window_minutes .cfg-preset-btn').evaluateAll(bs => bs.map(b => b.dataset.v)), ['5', '10', '20']);
+    await page.click('#bResetCfg');
+    await page.evaluate(() => window.__test.config({}));
+
+    // System reduced motion is not reported as a local override
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.evaluate(() => window.__test.config({}));
+    assert.equal(await page.locator('#sw_reduced_animation').isChecked(), false);
+    assert.equal(await page.locator('#card_reduced_animation').evaluate(e => e.classList.contains('modified')), false);
+    assert.ok(await page.locator('#cfgy').textContent().then(t => t.includes('reduced_animation: false')));
+    assert.equal(await page.locator('#cfgStatus').textContent(), '');
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
 
     // Close drawer
     await page.click('#bCfg');
