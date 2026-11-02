@@ -100,6 +100,57 @@ test('offline browser matrix: directions, session trees, layouts, widths and the
       await page.locator(`#segLang button[data-lang="${lang}"]`).click();
       await page.waitForFunction(label=>document.querySelector('#cvF').getAttribute('aria-label').includes(label),label);
     }
+
+    // Test configuration drawer: opening, interactive controls, live yaml, toolbar sync, and reset
+    await page.click('#bCfg');
+    await page.waitForFunction(() => !document.querySelector('#cfgp').hidden);
+    assert.equal(await page.locator('#bCfg').getAttribute('aria-pressed'), 'true');
+    assert.ok(await page.locator('#cfgy').textContent().then(t => t.includes('enabled: true')));
+
+    // Speed sync: panel -> toolbar
+    await page.click('#segCfgSpeed button[data-val="2x"]');
+    assert.equal(await page.locator('#segSpeed button[data-s="2"]').getAttribute('aria-pressed'), 'true');
+    assert.ok(await page.locator('#cfgy').textContent().then(t => t.includes('animation_speed: "2x"')));
+    assert.equal(await page.evaluate(() => localStorage.getItem('lr-speed')), '2');
+
+    // Speed sync: toolbar -> panel
+    await page.click('#segSpeed button[data-s="0.5"]');
+    assert.equal(await page.locator('#segCfgSpeed button[data-val="0.5x"]').getAttribute('aria-pressed'), 'true');
+    assert.ok(await page.locator('#cfgy').textContent().then(t => t.includes('animation_speed: "0.5x"')));
+
+    // Layout sync: panel -> toolbar
+    await page.click('#segCfgLayout button[data-val="tabs"]');
+    assert.equal(await page.locator('#segLayout button[data-l="tabs"]').getAttribute('aria-pressed'), 'true');
+    assert.ok(await page.locator('#cfgy').textContent().then(t => t.includes('layout: "tabs"')));
+
+    // Reduced animation toggle
+    await page.click('#card_reduced_animation .cfg-switch');
+    assert.ok(await page.locator('#cfgy').textContent().then(t => t.includes('reduced_animation: true')));
+    assert.equal(await page.evaluate(() => localStorage.getItem('lr-reduced')), 'true');
+
+    // Active window preset
+    const preset5 = page.locator('#card_active_window_minutes button[data-v="5"]');
+    if (await preset5.count() > 0) {
+      await preset5.click();
+      assert.ok(await page.locator('#cfgy').textContent().then(t => t.includes('active_window_minutes: 5')));
+      assert.equal(await page.evaluate(() => localStorage.getItem('lr-active-window')), '5');
+    }
+
+    // Copy YAML
+    await page.click('#bCopyCfg');
+    await page.waitForTimeout(100);
+
+    // Reset to defaults
+    await page.click('#bResetCfg');
+    assert.equal(await page.evaluate(() => localStorage.getItem('lr-speed')), null);
+    assert.equal(await page.evaluate(() => localStorage.getItem('lr-reduced')), null);
+    assert.equal(await page.evaluate(() => localStorage.getItem('lr-active-window')), null);
+    assert.ok(await page.locator('#cfgy').textContent().then(t => t.includes('animation_speed: "1x"')));
+
+    // Close drawer
+    await page.click('#bCfg');
+    await page.waitForFunction(() => document.querySelector('#cfgp').hidden);
+    assert.equal(await page.locator('#bCfg').getAttribute('aria-pressed'), 'false');
     // Unrecognized and inaccessible storage both retain RTL without breaking rendering.
     await page.evaluate(()=>localStorage.setItem('lr-flow-direction','invalid'));await page.reload();await page.waitForFunction(()=>window.__lr?.nodes>0);assert.equal((await snapshot()).direction,'rtl');
     await page.addInitScript(()=>{Storage.prototype.getItem=()=>{throw new Error('blocked');};Storage.prototype.setItem=()=>{throw new Error('blocked');};});
