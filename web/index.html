@@ -1183,7 +1183,7 @@ function layoutFlow() {
   hub.w = Math.max(hub.w, hubHeading(X, small, split, ls.r).minWidth);
   const nR = Math.max(1, ls.r.length), hasS = ls.s.length > 0, cols = hasS ? 4 : 3;
   const avail = W - 2 * G.pad - hub.w - G.gx * (cols - 1);
-  let cw = clamp(avail * (hasS ? .3 : mini() ? .5 : .42), small ? 90 : 110, 190), sw = hasS ? clamp(avail * .2, small ? 62 : 90, 130) : 0, xw = clamp(avail * (hasS ? .3 : mini() ? .5 : .52), small ? 90 : 130, 230);
+  let cw = clamp(avail * (hasS ? .32 : mini() ? .5 : .42), small ? 100 : 130, 200), sw = hasS ? clamp(avail * .28, small ? 80 : 110, 160) : 0, xw = clamp(avail * (hasS ? .26 : mini() ? .5 : .52), small ? 90 : 120, 220);
   /* when the minimum widths do not fit, shrink every column alike; otherwise the rightmost (clients) collapses to nothing */
   const room = W - 2 * G.pad - hub.w - 6 * (cols - 1), sum = cw + sw + xw;
   if (sum > room) { const f = Math.max(0, room) / sum; cw *= f; sw *= f; xw *= f; }
@@ -1204,7 +1204,7 @@ function layoutFlow() {
   let x = G.pad, xx, cx, sx;
   if (leftToRight()) { cx = x; x += cw + gapX; sx = x; if (hasS) x += sw + gapX; hub.x = x; x += hub.w + gapX; xx = x; }
   else { xx = x; x += xw + gapX; hub.x = x; x += hub.w + gapX; cx = x; x += cw + (hasS ? gapX : 0); sx = x; }
-  const grid = c => { const step = Math.min(step0 * (fill ? 1.5 : 1), availH / c); return { step, h: Math.max(22, Math.min(G.nh, step - G.gap * .6)), y0: G.top + (mini() ? 0 : (availH - step * c) / 2) + step / 2 }; };
+  const grid = c => { const step = Math.min(step0 * (fill ? 1.5 : 1), availH / c); return { step, h: Math.max(28, Math.min(G.nh, step - G.gap * .6)), y0: G.top + (mini() ? 0 : (availH - step * c) / 2) + step / 2 }; };
   const put = (n, ty, left, w, g) => { n.ty = ty; n.x = left; n.w = w; n.h = g.h; n.gm = Math.max(0, Math.min(16, (g.step - g.h) / 2 - 1, left - 1, W - left - w - 1)); if (n.fresh) n.y = n.ty; };
   const gx = grid(Math.max(1, ls.x.length));
   ls.x.forEach((n, i) => put(n, gx.y0 + i * gx.step, xx, xw, gx));
@@ -1213,10 +1213,10 @@ function layoutFlow() {
   for (const b of bands) {
     const m = Math.max(1, b.ss.length);
     if (b.c) {
-      const ch = clamp(m > 1 ? 52 : gb.h, small ? 38 : 44, G.nh);
+      const ch = clamp(m > 1 ? 52 : gb.h, small ? 40 : 46, G.nh);
       put(b.c, gb.y0 + (k + (m - 1) / 2) * gb.step, cx, cwR, { ...gb, h: ch });
     }
-    b.ss.forEach((n, i) => { const ind = n.kid ? Math.round(Math.min(16, swR * .14)) : 0; put(n, gb.y0 + (k + i) * gb.step, sx + ind, swR - ind, gb); if (n.kid) n.h = Math.round(n.h * .8); });
+    b.ss.forEach((n, i) => { const ind = n.kid ? Math.round(Math.min(16, swR * .14)) : 0; put(n, gb.y0 + (k + i) * gb.step, sx + ind, swR - ind, gb); if (n.kid) n.h = Math.round(n.h * .85); });
     k += m;
   }
   ls.r.forEach((n, i) => { n.ry = hub.ry0 + i * rh + (rh - 3) / 2; n.y = n.ry; n.ty = n.ry; });
@@ -1292,7 +1292,7 @@ function drawNode(n) {
   X.save(); X.globalAlpha = clamp(n.alpha, 0, 1) * dimN(n);
   nodeBox(n);
   const bf = `10px ${MONO}`, badge = n.idle ? translate('idleDuration').replace('{}', Math.floor(n.idle / 60000)) : '×' + n.n + (n.inf ? ' ●' + n.inf : ''); X.font = bf; const bw = X.measureText(badge).width, px = x + (small ? 8 : 11), iw = w - (small ? 16 : 22);
-  const f1 = `600 ${small ? 10.5 : 11.5}px ${SANS}`, f2 = `${small ? 9.5 : 11}px ${SANS}`, three = h >= 52;
+  const f1 = `600 ${small ? 10.5 : 11.5}px ${SANS}`, f2 = `${small ? 9.5 : 11}px ${SANS}`, three = h >= 46;
   const l1 = three ? y + 15 : y + h * .32, l2 = three ? y + 33 : y + h * .72;
   if (n.type === 'c') {
     const nm = mini() ? cliShort(n.id) : cliName(n.id), dotW = 14, sc = n.sess.size;
@@ -1302,9 +1302,31 @@ function drawNode(n) {
     txt(nm, px + 8 + dotW - 3, l1, f1, C.text, cw - dotW - 6);
     if (!mini()) txt(badge, px + iw, l1, bf, C.faint, 0, 'right');
     const tg = sc ? (expanded.has(n.id) ? '▾ ' : '▸ ') + sc + ' ' + translate('sessions') : '';
-    if (mini()) { txt(badge, px + iw, l2, bf, C.faint, 0, 'right'); if (tg) txt(tg, px, l2, f2, C.info, iw - bw - 4); }
-    else if (three) { txt(cliSub(n.id), px, l2, f2, C.muted, iw); if (tg) txt(tg, px, y + h - 11, f2, C.info, iw); }
-    else { X.font = f2; const tw2 = tg ? X.measureText(tg).width + 6 : 0; txt(cliSub(n.id), px, l2, f2, C.muted, iw - tw2); if (tg) txt(tg, px + iw, l2, f2, C.info, 0, 'right'); }
+    if (mini()) {
+      txt(badge, px + iw, l2, bf, C.faint, 0, 'right');
+      if (tg) txt(tg, px, l2, f2, C.info, iw - bw - 4);
+    } else if (three) {
+      txt(cliSub(n.id), px, l2, f2, C.muted, iw);
+      if (tg) {
+        const tgY = y + h - 11;
+        X.font = `600 10px ${SANS}`; const tgw = Math.min(iw, X.measureText(tg).width + 12);
+        X.fillStyle = expanded.has(n.id) ? rgba(C.info, .12) : rgba(C.border, .4);
+        rr(px, tgY - 8, tgw, 16, 4); X.fill();
+        X.strokeStyle = expanded.has(n.id) ? rgba(C.info, .35) : C.border; X.stroke();
+        txt(tg, px + 6, tgY, `600 10px ${SANS}`, expanded.has(n.id) ? C.info : C.muted, tgw - 10);
+      }
+    } else {
+      X.font = f2; const tw2 = tg ? X.measureText(tg).width + 16 : 0;
+      txt(cliSub(n.id), px, l2, f2, C.muted, Math.max(0, iw - tw2 - 4));
+      if (tg) {
+        X.font = `600 10px ${SANS}`; const tgw = Math.min(iw, X.measureText(tg).width + 12);
+        const tgX = px + iw - tgw;
+        X.fillStyle = expanded.has(n.id) ? rgba(C.info, .12) : rgba(C.border, .4);
+        rr(tgX, l2 - 8, tgw, 16, 4); X.fill();
+        X.strokeStyle = expanded.has(n.id) ? rgba(C.info, .35) : C.border; X.stroke();
+        txt(tg, tgX + 6, l2, `600 10px ${SANS}`, expanded.has(n.id) ? C.info : C.muted, tgw - 10);
+      }
+    }
   } else if (n.type === 's') {
     const ss = D.sessions.get(n.id), par = !n.kid && ss && ss.parent && D.sessions.get(ss.parent), p = n.kid && F.nodes.get('s' + n.par), one = h < 30;
     /* tree connector down the indent gutter from the root card; the last child's line ends at it (└), earlier ones are crossed (├) */
