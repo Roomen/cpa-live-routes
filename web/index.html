@@ -393,6 +393,7 @@ const I18N = {
     rateWeight60s: 'Peso de taxa dos últimos 60s',
     failWeight: 'Peso de falha',
     collapsedSubagents: 'Subagentes recolhidos',
+    collapsedSessions: 'Sessões recolhidas',
     clickExpandCollapse: 'Clique para expandir/recolher sessões',
     idle: 'Ocioso',
     idleMinutes: ' min ocioso',
@@ -560,6 +561,7 @@ const I18N = {
     rateWeight60s: 'Rate weight last 60s',
     failWeight: 'Fail weight',
     collapsedSubagents: 'Collapsed sub-agents',
+    collapsedSessions: 'Collapsed sessions',
     clickExpandCollapse: 'Click to expand/collapse sessions',
     idle: 'Idle',
     idleMinutes: ' min idle',
@@ -723,6 +725,7 @@ const I18N = {
     rateWeight60s: '近 60 秒速率权重',
     failWeight: '失败权重',
     collapsedSubagents: '折叠的子代理',
+    collapsedSessions: '折叠的历史会话',
     clickExpandCollapse: '点击展开/收起会话',
     idle: '空闲',
     idleMinutes: ' 分钟空闲',
@@ -1063,18 +1066,40 @@ function computeFlow(t) {
   /* session tree per client: each child right under its root; more than KIDS+1 children fold the rest into one 's-<root>' row */
   const kidsOf = new Map(), roots = [], cOpen = new Map(), rows = new Map(), sMeta = new Map(); sKey = new Map();
   for (const s of [...open].sort((a, b) => a - b)) {
-    const p = parOf(s), c = scli.get(s);
-    if (p && open.has(p) && scli.get(p) === c) { if (!kidsOf.has(p)) kidsOf.set(p, []); kidsOf.get(p).push(s); } else roots.push(s);
+    const p = parOf(s), c = scli.get(s) || 0;
+    if (p && open.has(p) && (scli.get(p) || 0) === c) { if (!kidsOf.has(p)) kidsOf.set(p, []); kidsOf.get(p).push(s); } else roots.push(s);
     if (!cOpen.has(c)) cOpen.set(c, new Set()); cOpen.get(c).add(s);
   }
-  let o = 0;
+  const cRoots = new Map();
   for (const r of roots) {
-    const ks = [], vis = new Set([r]), walk = p => { for (const k of kidsOf.get(p) || []) if (!vis.has(k)) { vis.add(k); ks.push(k); walk(k); } }; walk(r);
-    const show = ks.length > KIDS + 1 ? ks.slice(0, KIDS) : ks, fold = ks.slice(show.length);
-    sKey.set(r, 's' + r); sMeta.set('s' + r, { o: o++, par: 0, kids: ks.length, kidIds: ks, act: Math.max(act.get(r), ...ks.map(k => act.get(k))) });
-    show.forEach((k, i) => { sKey.set(k, 's' + k); sMeta.set('s' + k, { o: o++, par: r }); });
-    if (fold.length) { fold.forEach(k => sKey.set(k, 's-' + r)); sMeta.set('s-' + r, { o: o++, par: r, fold }); }
-    const c = scli.get(r); rows.set(c, (rows.get(c) || 0) + 1 + show.length + (fold.length ? 1 : 0));
+    const c = scli.get(r) || 0;
+    if (!cRoots.has(c)) cRoots.set(c, []);
+    cRoots.get(c).push(r);
+  }
+  const MAX_ROOTS = 6;
+  let o = 0;
+  for (const [c, rList] of cRoots) {
+    rList.sort((a, b) => (act.get(b) || 0) - (act.get(a) || 0));
+    const showR = rList.length > MAX_ROOTS + 1 ? rList.slice(0, MAX_ROOTS) : rList;
+    const foldR = rList.slice(showR.length);
+    for (const r of showR) {
+      const ks = [], vis = new Set([r]), walk = p => { for (const k of kidsOf.get(p) || []) if (!vis.has(k)) { vis.add(k); ks.push(k); walk(k); } }; walk(r);
+      const show = ks.length > KIDS + 1 ? ks.slice(0, KIDS) : ks, fold = ks.slice(show.length);
+      sKey.set(r, 's' + r); sMeta.set('s' + r, { o: o++, par: 0, kids: ks.length, kidIds: ks, act: Math.max(act.get(r) || 0, ...ks.map(k => act.get(k) || 0)), cli: c });
+      show.forEach(k => { sKey.set(k, 's' + k); sMeta.set('s' + k, { o: o++, par: r, cli: c }); });
+      if (fold.length) { fold.forEach(k => sKey.set(k, 's-' + r)); sMeta.set('s-' + r, { o: o++, par: r, fold, cli: c }); }
+      rows.set(c, (rows.get(c) || 0) + 1 + show.length + (fold.length ? 1 : 0));
+    }
+    if (foldR.length) {
+      const allFolded = [];
+      const foldKey = 's-c' + c;
+      for (const fr of foldR) {
+        allFolded.push(fr); sKey.set(fr, foldKey);
+        const walk = p => { for (const k of kidsOf.get(p) || []) { allFolded.push(k); sKey.set(k, foldKey); walk(k); } }; walk(fr);
+      }
+      sMeta.set(foldKey, { o: o++, par: 0, kids: 0, kidIds: [], fold: allFolded, cli: c, act: Math.max(...allFolded.map(k => act.get(k) || 0)) });
+      rows.set(c, (rows.get(c) || 0) + 1);
+    }
   }
   expanded.clear(); for (const [c, nr] of rows) if (opened.has(c) || (!collapsed.has(c) && nr <= SMAX)) expanded.add(c);
   const handle = (r, ghost) => {
@@ -1179,7 +1204,7 @@ function layoutFlow() {
   let x = G.pad, xx, cx, sx;
   if (leftToRight()) { cx = x; x += cw + gapX; sx = x; if (hasS) x += sw + gapX; hub.x = x; x += hub.w + gapX; xx = x; }
   else { xx = x; x += xw + gapX; hub.x = x; x += hub.w + gapX; cx = x; x += cw + (hasS ? gapX : 0); sx = x; }
-  const grid = c => { const step = Math.min(step0 * (fill ? 1.5 : 1), availH / c); return { step, h: Math.min(G.nh, step - G.gap * .6), y0: G.top + (mini() ? 0 : (availH - step * c) / 2) + step / 2 }; };
+  const grid = c => { const step = Math.min(step0 * (fill ? 1.5 : 1), availH / c); return { step, h: Math.max(22, Math.min(G.nh, step - G.gap * .6)), y0: G.top + (mini() ? 0 : (availH - step * c) / 2) + step / 2 }; };
   const put = (n, ty, left, w, g) => { n.ty = ty; n.x = left; n.w = w; n.h = g.h; n.gm = Math.max(0, Math.min(16, (g.step - g.h) / 2 - 1, left - 1, W - left - w - 1)); if (n.fresh) n.y = n.ty; };
   const gx = grid(Math.max(1, ls.x.length));
   ls.x.forEach((n, i) => put(n, gx.y0 + i * gx.step, xx, xw, gx));
@@ -1187,8 +1212,10 @@ function layoutFlow() {
   let k = 0;
   for (const b of bands) {
     const m = Math.max(1, b.ss.length);
-    if (b.c) put(b.c, gb.y0 + (k + (m - 1) / 2) * gb.step, cx, cwR, gb);
-    /* children sit indented right under their root, on slightly shorter cards */
+    if (b.c) {
+      const ch = clamp(m > 1 ? 52 : gb.h, small ? 38 : 44, G.nh);
+      put(b.c, gb.y0 + (k + (m - 1) / 2) * gb.step, cx, cwR, { ...gb, h: ch });
+    }
     b.ss.forEach((n, i) => { const ind = n.kid ? Math.round(Math.min(16, swR * .14)) : 0; put(n, gb.y0 + (k + i) * gb.step, sx + ind, swR - ind, gb); if (n.kid) n.h = Math.round(n.h * .8); });
     k += m;
   }
@@ -1282,7 +1309,7 @@ function drawNode(n) {
     const ss = D.sessions.get(n.id), par = !n.kid && ss && ss.parent && D.sessions.get(ss.parent), p = n.kid && F.nodes.get('s' + n.par), one = h < 30;
     /* tree connector down the indent gutter from the root card; the last child's line ends at it (└), earlier ones are crossed (├) */
     if (p) { const gx = Math.round(p.x + (x - p.x) / 2) + .5; X.strokeStyle = mix(C.border, C.faint, .75); X.lineWidth = 1; X.beginPath(); X.moveTo(gx, p.y + p.h / 2); X.lineTo(gx, n.y); X.lineTo(x, n.y); X.stroke(); }
-    const nm = n.fold ? '+' + n.fold.length + ' ' + translate('subAgents') : (par ? '↳ ' : '') + sessShort(n.id);
+    const nm = n.fold ? '+' + n.fold.length + ' ' + (n.par ? translate('subAgents') : translate('sessions')) : (par ? '↳ ' : '') + sessShort(n.id);
     txt(nm, px, one ? y + h / 2 : l1, `600 ${small || n.kid ? 10 : 11}px ${n.fold ? SANS : MONO}`, n.kid ? C.muted : C.text, iw - bw - 4);
     txt(badge, px + iw, one ? y + h / 2 : l1, bf, C.faint, 0, 'right');
     if (!one) txt(n.fold ? translate('foldedHint') : n.kid ? translate('subAgents') : par ? translate('parentSession') + ' ' + par.short : n.kids ? translate('subAgents') + ' ' + n.kids + (n.kinf ? ' · ●' + n.kinf : '') : translate('session'), px, l2, f2, n.kids && !n.kid ? C.info : C.muted, iw);
@@ -1400,7 +1427,11 @@ function drawFlow(t) {
 
 /* flow interaction */
 function hitFlow(mx, my) {
-  const inR = n => mx >= n.x && mx <= n.x + n.w && my >= n.y - n.h / 2 && my <= n.y + n.h / 2;
+  const inR = n => {
+    const minH = n.type === 'c' ? 40 : Math.max(22, n.h);
+    const effH = Math.max(n.h, minH);
+    return mx >= n.x && mx <= n.x + n.w && my >= n.y - effH / 2 && my <= n.y + effH / 2;
+  };
   for (const t of ['c', 's', 'x']) for (const n of F.lists[t]) if (n.alpha > .2 && inR(n)) return { k: n.key, n };
   if (mx >= hub.x && mx <= hub.x + hub.w && my >= hub.y && my <= hub.y + hub.h) {
     const i = Math.floor((my - hub.ry0) / hub.rh), n = F.lists.r[i];
@@ -1430,14 +1461,14 @@ function nodeTip(h) {
   let s = `<b>${esc(nodeTitle(n))}</b>`;
   if (n.type === 'c') { const c = D.clients.get(n.id); s += trow('harness', c ? c.kind : '—') + trow(translate('keyIp'), cliSub(n.id) || '—') + trow(translate('sessions'), n.sess.size) + (n.sess.size ? trow('', expanded.has(n.id) ? translate('clickExpandCollapse') : translate('clickExpandCollapse')) : ''); }
   const ks = a => a.slice(0, 4).map(sessShort).join(' ') + (a.length > 4 ? ' …+' + (a.length - 4) : '');
-  if (n.type === 's' && n.fold) s += trow(translate('collapsedSubagents'), ks(n.fold)) + trow(translate('parentSession'), sessShort(n.par));
+  if (n.type === 's' && n.fold) s += trow(n.par ? translate('collapsedSubagents') : translate('collapsedSessions'), ks(n.fold)) + (n.par ? trow(translate('parentSession'), sessShort(n.par)) : trow(translate('client'), cliName(n.cli)));
   else if (n.type === 's') { const ss = D.sessions.get(n.id) || {}, par = ss.parent && D.sessions.get(ss.parent); s += trow(translate('sessionId'), ss.sid || '—') + trow(translate('parentSession'), par ? par.sid : translate('none')) + (n.kids ? trow(translate('subAgents') + ' (' + n.kids + ')', ks(n.kidIds)) + trow(translate('subAgentsInProgress'), n.kinf) : ''); }
   if (n.idle) s += trow(translate('idle'), Math.floor(n.idle / 60000) + translate('minutes'));
   if (n.type === 'x') s += trow(translate('credential'), exitSub(n.id) || '—') + (n.t429 ? trow(translate('recent429'), fmtClock(n.t429, true), 'bad') : '');
   if (n.type === 'r') s += trow(translate('rule'), ruleLabel(n.id));
   return s + trow(translate('requests') + ' (' + rangeLabel() + ')', n.n) + trow(translate('inProgress'), n.inf) + trow(translate('successRate'), n.ok + n.fail >= 3 ? rate : '—') + trow(translate('tokens'), fmtK(n.tok)) + trow(translate('avgLatency'), n.ok >= 3 ? (n.lat / n.ok / 1000).toFixed(1) + 's' : '—');
 }
-const nodeTitle = n => !n ? '' : n.type === 'c' ? cliName(n.id) : n.type === 's' ? (n.fold ? '+' + n.fold.length + ' ' + translate('subAgents') : sessShort(n.id)) : n.type === 'r' ? ruleLabel(n.id) : exitName(n.id);
+const nodeTitle = n => !n ? '' : n.type === 'c' ? cliName(n.id) : n.type === 's' ? (n.fold ? '+' + n.fold.length + ' ' + (n.par ? translate('subAgents') : translate('sessions')) : sessShort(n.id)) : n.type === 'r' ? ruleLabel(n.id) : exitName(n.id);
 function placeTip(cx, cy) {
   const tw = tip.offsetWidth, th = tip.offsetHeight;
   let l = cx + 14; if (l + tw > innerWidth - 4) l = cx - tw - 14; l = clamp(l, 4, Math.max(4, innerWidth - tw - 4));
