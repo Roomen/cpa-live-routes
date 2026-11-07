@@ -17,6 +17,7 @@ const (
 	KindOpenCode    = "opencode"
 	KindGeminiCLI   = "gemini-cli"
 	KindAntigravity = "antigravity"
+	KindZCode       = "zcode"
 	KindSDK         = "sdk"
 	KindOther       = "other"
 )
@@ -268,6 +269,8 @@ func ParseUA(ua string) UA {
 		return UA{KindGeminiCLI, withVer("Gemini CLI"), ua}
 	case strings.HasPrefix(lname, "antigravity"), lname == "agy":
 		return UA{KindAntigravity, withVer("Antigravity"), ua}
+	case strings.HasPrefix(lname, "zcode"):
+		return UA{KindZCode, withVer("ZCode"), ua}
 	}
 	label := truncRunes(tok, 40)
 	for _, p := range []string{"openai", "anthropic", "python", "node", "axios", "undici"} {
@@ -295,6 +298,8 @@ func ClientFromSession(sid string) (kind, label string) {
 		return KindGeminiCLI, "Gemini CLI"
 	case "agy", "antigravity":
 		return KindAntigravity, "Antigravity"
+	case "zcode":
+		return KindZCode, "ZCode"
 	}
 	return "", ""
 }

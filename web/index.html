@@ -79,11 +79,12 @@ h1{font-size:18px;margin:0;font-weight:650;letter-spacing:.01em}
 .lg{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--text-quaternary);white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis}
 .lg i{width:9px;height:9px;border-radius:50%;flex:none}
 .box{position:relative;overflow:hidden}
+#boxF{overflow-x:hidden;overflow-y:auto;max-height:calc(100vh - 160px)}
 .box canvas{display:block;max-width:100%}
 .box+.box{border-top:1px solid var(--border-color)}
 #cvT{touch-action:pan-y;cursor:grab}
 .empty{padding:36px 16px;text-align:center;color:var(--text-faint)}
-.tip{position:fixed;left:0;top:0;pointer-events:none;z-index:50;background:var(--bg-card);border:1px solid var(--border-color);border-radius:8px;box-shadow:var(--shadow);padding:8px 10px;font-size:12px;line-height:1.5;opacity:0;transition:opacity .12s;max-width:min(320px,calc(100vw - 16px));min-width:200px}
+.tip{position:fixed;left:0;top:0;pointer-events:none;z-index:50;background:var(--bg-card);border:1px solid var(--border-color);border-radius:8px;box-shadow:var(--shadow);padding:8px 10px;font-size:12px;line-height:1.5;opacity:0;transition:opacity .12s;max-width:min(340px,calc(100vw - 16px));min-width:200px;max-height:calc(100vh - 24px);overflow-y:auto}
 .tip.on{opacity:1}
 .tip b{display:flex;align-items:center;gap:6px;margin-bottom:2px;font-weight:600;word-break:break-all}
 .tip b i{width:8px;height:8px;border-radius:50%;flex:none}
@@ -393,6 +394,9 @@ const I18N = {
     rateWeight60s: 'Peso de taxa dos últimos 60s',
     failWeight: 'Peso de falha',
     collapsedSubagents: 'Subagentes recolhidos',
+    collapsedSessions: 'Sessões recolhidas',
+    expandAllSessions: 'Expandir todas as sessões ({})',
+    collapseEarlierSessions: '▴ Recolher sessões anteriores',
     clickExpandCollapse: 'Clique para expandir/recolher sessões',
     idle: 'Ocioso',
     idleMinutes: ' min ocioso',
@@ -560,6 +564,9 @@ const I18N = {
     rateWeight60s: 'Rate weight last 60s',
     failWeight: 'Fail weight',
     collapsedSubagents: 'Collapsed sub-agents',
+    collapsedSessions: 'Collapsed sessions',
+    expandAllSessions: 'Expand all sessions ({})',
+    collapseEarlierSessions: '▴ Collapse earlier sessions',
     clickExpandCollapse: 'Click to expand/collapse sessions',
     idle: 'Idle',
     idleMinutes: ' min idle',
@@ -723,6 +730,9 @@ const I18N = {
     rateWeight60s: '近 60 秒速率权重',
     failWeight: '失败权重',
     collapsedSubagents: '折叠的子代理',
+    collapsedSessions: '折叠的历史会话',
+    expandAllSessions: '展开全部会话 ({})',
+    collapseEarlierSessions: '▴ 收起历史会话',
     clickExpandCollapse: '点击展开/收起会话',
     idle: '空闲',
     idleMinutes: ' 分钟空闲',
@@ -1026,7 +1036,7 @@ function trackFlight(prev, r) {
 
 /* ---------- flow model ---------- */
 /* expanded = clients showing their sessions, derived on every compute: shown unless the user collapsed it, or it would need more than SMAX session rows and the user did not open it */
-const expanded = new Set(), collapsed = new Set(), opened = new Set(), SMAX = 6, KID_MS = 90000, KIDS = 3;
+const expanded = new Set(), collapsed = new Set(), opened = new Set(), expandedAll = new Set(), SMAX = 6, KID_MS = 90000, KIDS = 3;
 const PN = new Map();
 let F = { nodes: new Map(), edges: new Map(), paths: new Map(), lists: { c: [], s: [], r: [], x: [] }, sig: '', totX: 0, nIn: 0 };
 let hub = { x: 0, y: 0, w: 0, h: 0, ry0: 0, rh: 28, hdr: 40, foot: 24 };
@@ -1063,18 +1073,45 @@ function computeFlow(t) {
   /* session tree per client: each child right under its root; more than KIDS+1 children fold the rest into one 's-<root>' row */
   const kidsOf = new Map(), roots = [], cOpen = new Map(), rows = new Map(), sMeta = new Map(); sKey = new Map();
   for (const s of [...open].sort((a, b) => a - b)) {
-    const p = parOf(s), c = scli.get(s);
-    if (p && open.has(p) && scli.get(p) === c) { if (!kidsOf.has(p)) kidsOf.set(p, []); kidsOf.get(p).push(s); } else roots.push(s);
+    const p = parOf(s), c = scli.get(s) || 0;
+    if (p && open.has(p) && (scli.get(p) || 0) === c) { if (!kidsOf.has(p)) kidsOf.set(p, []); kidsOf.get(p).push(s); } else roots.push(s);
     if (!cOpen.has(c)) cOpen.set(c, new Set()); cOpen.get(c).add(s);
   }
-  let o = 0;
+  const cRoots = new Map();
   for (const r of roots) {
-    const ks = [], vis = new Set([r]), walk = p => { for (const k of kidsOf.get(p) || []) if (!vis.has(k)) { vis.add(k); ks.push(k); walk(k); } }; walk(r);
-    const show = ks.length > KIDS + 1 ? ks.slice(0, KIDS) : ks, fold = ks.slice(show.length);
-    sKey.set(r, 's' + r); sMeta.set('s' + r, { o: o++, par: 0, kids: ks.length, kidIds: ks, act: Math.max(act.get(r), ...ks.map(k => act.get(k))) });
-    show.forEach((k, i) => { sKey.set(k, 's' + k); sMeta.set('s' + k, { o: o++, par: r }); });
-    if (fold.length) { fold.forEach(k => sKey.set(k, 's-' + r)); sMeta.set('s-' + r, { o: o++, par: r, fold }); }
-    const c = scli.get(r); rows.set(c, (rows.get(c) || 0) + 1 + show.length + (fold.length ? 1 : 0));
+    const c = scli.get(r) || 0;
+    if (!cRoots.has(c)) cRoots.set(c, []);
+    cRoots.get(c).push(r);
+  }
+  const MAX_ROOTS = 6;
+  let o = 0;
+  for (const [c, rList] of cRoots) {
+    rList.sort((a, b) => (act.get(b) || 0) - (act.get(a) || 0));
+    const showAll = expandedAll.has(c);
+    const showR = showAll ? rList : (rList.length > MAX_ROOTS + 1 ? rList.slice(0, MAX_ROOTS) : rList);
+    const foldR = showAll ? [] : rList.slice(showR.length);
+    for (const r of showR) {
+      const ks = [], vis = new Set([r]), walk = p => { for (const k of kidsOf.get(p) || []) if (!vis.has(k)) { vis.add(k); ks.push(k); walk(k); } }; walk(r);
+      const show = ks.length > KIDS + 1 ? ks.slice(0, KIDS) : ks, fold = ks.slice(show.length);
+      sKey.set(r, 's' + r); sMeta.set('s' + r, { o: o++, par: 0, kids: ks.length, kidIds: ks, act: Math.max(act.get(r) || 0, ...ks.map(k => act.get(k) || 0)), cli: c });
+      show.forEach(k => { sKey.set(k, 's' + k); sMeta.set('s' + k, { o: o++, par: r, cli: c }); });
+      if (fold.length) { fold.forEach(k => sKey.set(k, 's-' + r)); sMeta.set('s-' + r, { o: o++, par: r, fold, cli: c }); }
+      rows.set(c, (rows.get(c) || 0) + 1 + show.length + (fold.length ? 1 : 0));
+    }
+    if (foldR.length) {
+      const allFolded = [];
+      const foldKey = 's-c' + c;
+      for (const fr of foldR) {
+        allFolded.push(fr); sKey.set(fr, foldKey);
+        const walk = p => { for (const k of kidsOf.get(p) || []) { allFolded.push(k); sKey.set(k, foldKey); walk(k); } }; walk(fr);
+      }
+      sMeta.set(foldKey, { o: o++, par: 0, kids: 0, kidIds: [], fold: allFolded, cli: c, act: Math.max(...allFolded.map(k => act.get(k) || 0)), toggleAll: true });
+      rows.set(c, (rows.get(c) || 0) + 1);
+    } else if (showAll && rList.length > MAX_ROOTS) {
+      const foldKey = 's-less-' + c;
+      sMeta.set(foldKey, { o: o++, par: 0, kids: 0, kidIds: [], fold: [], cli: c, act: t, collapseAll: true });
+      rows.set(c, (rows.get(c) || 0) + 1);
+    }
   }
   expanded.clear(); for (const [c, nr] of rows) if (opened.has(c) || (!collapsed.has(c) && nr <= SMAX)) expanded.add(c);
   const handle = (r, ghost) => {
@@ -1158,7 +1195,7 @@ function layoutFlow() {
   hub.w = Math.max(hub.w, hubHeading(X, small, split, ls.r).minWidth);
   const nR = Math.max(1, ls.r.length), hasS = ls.s.length > 0, cols = hasS ? 4 : 3;
   const avail = W - 2 * G.pad - hub.w - G.gx * (cols - 1);
-  let cw = clamp(avail * (hasS ? .3 : mini() ? .5 : .42), small ? 90 : 110, 190), sw = hasS ? clamp(avail * .2, small ? 62 : 90, 130) : 0, xw = clamp(avail * (hasS ? .3 : mini() ? .5 : .52), small ? 90 : 130, 230);
+  let cw = clamp(avail * (hasS ? .35 : mini() ? .5 : .42), small ? 120 : 155, 230), sw = hasS ? clamp(avail * .28, small ? 90 : 120, 170) : 0, xw = clamp(avail * (hasS ? .25 : mini() ? .5 : .52), small ? 90 : 120, 220);
   /* when the minimum widths do not fit, shrink every column alike; otherwise the rightmost (clients) collapses to nothing */
   const room = W - 2 * G.pad - hub.w - 6 * (cols - 1), sum = cw + sw + xw;
   if (sum > room) { const f = Math.max(0, room) / sum; cw *= f; sw *= f; xw *= f; }
@@ -1171,7 +1208,8 @@ function layoutFlow() {
   const slots = bands.reduce((s, b) => s + Math.max(1, b.ss.length), 0);
   const step0 = G.nh + G.gap, cnt = Math.max(1, slots, ls.x.length);
   let rh = G.rh; const hubNat = G.hdr + nR * rh + G.foot;
-  FH = clamp(Math.ceil(G.top + G.bot + Math.max(hubNat, cnt * step0) + 4), G.min, G.max);
+  const effGMax = expandedAll.size > 0 ? Math.max(G.max, Math.min(3200, cnt * 34 + G.top + G.bot + 20)) : G.max;
+  FH = clamp(Math.ceil(G.top + G.bot + Math.max(hubNat, cnt * step0) + 4), G.min, effGMax);
   const availH = FH - G.top - G.bot;
   if (hubNat > availH) rh = Math.max(12, (availH - G.hdr - G.foot) / nR);
   hub.rh = rh; hub.hdr = G.hdr; hub.foot = G.foot; hub.h = G.hdr + nR * rh + G.foot; hub.y = G.top + (mini() ? 0 : Math.max(0, (availH - hub.h) / 2)); hub.ry0 = hub.y + G.hdr;
@@ -1179,7 +1217,7 @@ function layoutFlow() {
   let x = G.pad, xx, cx, sx;
   if (leftToRight()) { cx = x; x += cw + gapX; sx = x; if (hasS) x += sw + gapX; hub.x = x; x += hub.w + gapX; xx = x; }
   else { xx = x; x += xw + gapX; hub.x = x; x += hub.w + gapX; cx = x; x += cw + (hasS ? gapX : 0); sx = x; }
-  const grid = c => { const step = Math.min(step0 * (fill ? 1.5 : 1), availH / c); return { step, h: Math.min(G.nh, step - G.gap * .6), y0: G.top + (mini() ? 0 : (availH - step * c) / 2) + step / 2 }; };
+  const grid = c => { const step = Math.min(step0 * (fill ? 1.5 : 1), availH / c); return { step, h: Math.max(28, Math.min(G.nh, step - G.gap * .6)), y0: G.top + (mini() ? 0 : (availH - step * c) / 2) + step / 2 }; };
   const put = (n, ty, left, w, g) => { n.ty = ty; n.x = left; n.w = w; n.h = g.h; n.gm = Math.max(0, Math.min(16, (g.step - g.h) / 2 - 1, left - 1, W - left - w - 1)); if (n.fresh) n.y = n.ty; };
   const gx = grid(Math.max(1, ls.x.length));
   ls.x.forEach((n, i) => put(n, gx.y0 + i * gx.step, xx, xw, gx));
@@ -1187,9 +1225,11 @@ function layoutFlow() {
   let k = 0;
   for (const b of bands) {
     const m = Math.max(1, b.ss.length);
-    if (b.c) put(b.c, gb.y0 + (k + (m - 1) / 2) * gb.step, cx, cwR, gb);
-    /* children sit indented right under their root, on slightly shorter cards */
-    b.ss.forEach((n, i) => { const ind = n.kid ? Math.round(Math.min(16, swR * .14)) : 0; put(n, gb.y0 + (k + i) * gb.step, sx + ind, swR - ind, gb); if (n.kid) n.h = Math.round(n.h * .8); });
+    if (b.c) {
+      const ch = clamp(m > 1 ? 58 : gb.h, small ? 44 : 52, G.nh);
+      put(b.c, gb.y0 + (k + (m - 1) / 2) * gb.step, cx, cwR, { ...gb, h: ch });
+    }
+    b.ss.forEach((n, i) => { const ind = n.kid ? Math.round(Math.min(16, swR * .14)) : 0; put(n, gb.y0 + (k + i) * gb.step, sx + ind, swR - ind, gb); if (n.kid) n.h = Math.round(n.h * .85); });
     k += m;
   }
   ls.r.forEach((n, i) => { n.ry = hub.ry0 + i * rh + (rh - 3) / 2; n.y = n.ry; n.ty = n.ry; });
@@ -1265,8 +1305,8 @@ function drawNode(n) {
   X.save(); X.globalAlpha = clamp(n.alpha, 0, 1) * dimN(n);
   nodeBox(n);
   const bf = `10px ${MONO}`, badge = n.idle ? translate('idleDuration').replace('{}', Math.floor(n.idle / 60000)) : '×' + n.n + (n.inf ? ' ●' + n.inf : ''); X.font = bf; const bw = X.measureText(badge).width, px = x + (small ? 8 : 11), iw = w - (small ? 16 : 22);
-  const f1 = `600 ${small ? 10.5 : 11.5}px ${SANS}`, f2 = `${small ? 9.5 : 11}px ${SANS}`, three = h >= 52;
-  const l1 = three ? y + 15 : y + h * .32, l2 = three ? y + 33 : y + h * .72;
+  const f1 = `600 ${small ? 10.5 : 11.5}px ${SANS}`, f2 = `${small ? 9.5 : 11}px ${SANS}`, three = h >= 48;
+  const l1 = three ? y + 13 : y + h * .32, l2 = three ? y + 29 : y + h * .72;
   if (n.type === 'c') {
     const nm = mini() ? cliShort(n.id) : cliName(n.id), dotW = 14, sc = n.sess.size;
     X.font = f1; const cw = Math.min(mini() ? iw : iw - bw - 6, X.measureText(nm).width + 12 + dotW);
@@ -1275,17 +1315,39 @@ function drawNode(n) {
     txt(nm, px + 8 + dotW - 3, l1, f1, C.text, cw - dotW - 6);
     if (!mini()) txt(badge, px + iw, l1, bf, C.faint, 0, 'right');
     const tg = sc ? (expanded.has(n.id) ? '▾ ' : '▸ ') + sc + ' ' + translate('sessions') : '';
-    if (mini()) { txt(badge, px + iw, l2, bf, C.faint, 0, 'right'); if (tg) txt(tg, px, l2, f2, C.info, iw - bw - 4); }
-    else if (three) { txt(cliSub(n.id), px, l2, f2, C.muted, iw); if (tg) txt(tg, px, y + h - 11, f2, C.info, iw); }
-    else { X.font = f2; const tw2 = tg ? X.measureText(tg).width + 6 : 0; txt(cliSub(n.id), px, l2, f2, C.muted, iw - tw2); if (tg) txt(tg, px + iw, l2, f2, C.info, 0, 'right'); }
+    if (mini()) {
+      txt(badge, px + iw, l2, bf, C.faint, 0, 'right');
+      if (tg) txt(tg, px, l2, f2, C.info, iw - bw - 4);
+    } else if (three) {
+      txt(cliSub(n.id), px, l2, f2, C.muted, iw);
+      if (tg) {
+        const tgY = y + h - 11;
+        X.font = `600 10px ${SANS}`; const tgw = Math.min(iw, X.measureText(tg).width + 14);
+        X.fillStyle = expanded.has(n.id) ? rgba(C.info, .14) : rgba(C.border, .4);
+        rr(px, tgY - 8, tgw, 16, 5); X.fill();
+        X.strokeStyle = expanded.has(n.id) ? rgba(C.info, .45) : C.border; X.stroke();
+        txt(tg, px + 7, tgY, `600 10px ${SANS}`, expanded.has(n.id) ? C.info : C.muted, tgw - 12);
+      }
+    } else {
+      X.font = f2; const tw2 = tg ? X.measureText(tg).width + 16 : 0;
+      txt(cliSub(n.id), px, l2, f2, C.muted, Math.max(0, iw - tw2 - 4));
+      if (tg) {
+        X.font = `600 10px ${SANS}`; const tgw = Math.min(iw, X.measureText(tg).width + 12);
+        const tgX = px + iw - tgw;
+        X.fillStyle = expanded.has(n.id) ? rgba(C.info, .12) : rgba(C.border, .4);
+        rr(tgX, l2 - 8, tgw, 16, 4); X.fill();
+        X.strokeStyle = expanded.has(n.id) ? rgba(C.info, .35) : C.border; X.stroke();
+        txt(tg, tgX + 6, l2, `600 10px ${SANS}`, expanded.has(n.id) ? C.info : C.muted, tgw - 10);
+      }
+    }
   } else if (n.type === 's') {
     const ss = D.sessions.get(n.id), par = !n.kid && ss && ss.parent && D.sessions.get(ss.parent), p = n.kid && F.nodes.get('s' + n.par), one = h < 30;
     /* tree connector down the indent gutter from the root card; the last child's line ends at it (└), earlier ones are crossed (├) */
     if (p) { const gx = Math.round(p.x + (x - p.x) / 2) + .5; X.strokeStyle = mix(C.border, C.faint, .75); X.lineWidth = 1; X.beginPath(); X.moveTo(gx, p.y + p.h / 2); X.lineTo(gx, n.y); X.lineTo(x, n.y); X.stroke(); }
-    const nm = n.fold ? '+' + n.fold.length + ' ' + translate('subAgents') : (par ? '↳ ' : '') + sessShort(n.id);
+    const nm = n.collapseAll ? translate('collapseEarlierSessions') : n.fold ? '+' + n.fold.length + ' ' + (n.par ? translate('subAgents') : translate('sessions')) : (par ? '↳ ' : '') + sessShort(n.id);
     txt(nm, px, one ? y + h / 2 : l1, `600 ${small || n.kid ? 10 : 11}px ${n.fold ? SANS : MONO}`, n.kid ? C.muted : C.text, iw - bw - 4);
     txt(badge, px + iw, one ? y + h / 2 : l1, bf, C.faint, 0, 'right');
-    if (!one) txt(n.fold ? translate('foldedHint') : n.kid ? translate('subAgents') : par ? translate('parentSession') + ' ' + par.short : n.kids ? translate('subAgents') + ' ' + n.kids + (n.kinf ? ' · ●' + n.kinf : '') : translate('session'), px, l2, f2, n.kids && !n.kid ? C.info : C.muted, iw);
+    if (!one) txt(n.collapseAll ? translate('collapseEarlierSessions') : n.fold ? (n.toggleAll ? translate('expandAllSessions').replace('{}', n.fold.length) : translate('foldedHint')) : n.kid ? translate('subAgents') : par ? translate('parentSession') + ' ' + par.short : n.kids ? translate('subAgents') + ' ' + n.kids + (n.kinf ? ' · ●' + n.kinf : '') : translate('session'), px, l2, f2, n.kids && !n.kid || n.toggleAll ? C.info : C.muted, iw);
   } else {
     const r = small ? 11 : 16, lw = small ? 3.5 : 4.5, rcx = x + (small ? 7 : 10) + r + lw / 2, rcy = y + h / 2, ring = h >= 30 && !mini();
     let tx = x + (small ? 8 : 11);
@@ -1400,7 +1462,11 @@ function drawFlow(t) {
 
 /* flow interaction */
 function hitFlow(mx, my) {
-  const inR = n => mx >= n.x && mx <= n.x + n.w && my >= n.y - n.h / 2 && my <= n.y + n.h / 2;
+  const inR = n => {
+    const minH = n.type === 'c' ? 40 : Math.max(22, n.h);
+    const effH = Math.max(n.h, minH);
+    return mx >= n.x && mx <= n.x + n.w && my >= n.y - effH / 2 && my <= n.y + effH / 2;
+  };
   for (const t of ['c', 's', 'x']) for (const n of F.lists[t]) if (n.alpha > .2 && inR(n)) return { k: n.key, n };
   if (mx >= hub.x && mx <= hub.x + hub.w && my >= hub.y && my <= hub.y + hub.h) {
     const i = Math.floor((my - hub.ry0) / hub.rh), n = F.lists.r[i];
@@ -1430,25 +1496,26 @@ function nodeTip(h) {
   let s = `<b>${esc(nodeTitle(n))}</b>`;
   if (n.type === 'c') { const c = D.clients.get(n.id); s += trow('harness', c ? c.kind : '—') + trow(translate('keyIp'), cliSub(n.id) || '—') + trow(translate('sessions'), n.sess.size) + (n.sess.size ? trow('', expanded.has(n.id) ? translate('clickExpandCollapse') : translate('clickExpandCollapse')) : ''); }
   const ks = a => a.slice(0, 4).map(sessShort).join(' ') + (a.length > 4 ? ' …+' + (a.length - 4) : '');
-  if (n.type === 's' && n.fold) s += trow(translate('collapsedSubagents'), ks(n.fold)) + trow(translate('parentSession'), sessShort(n.par));
+  if (n.type === 's' && n.fold) s += trow(n.par ? translate('collapsedSubagents') : translate('collapsedSessions'), ks(n.fold)) + (n.par ? trow(translate('parentSession'), sessShort(n.par)) : trow(translate('client'), cliName(n.cli)));
   else if (n.type === 's') { const ss = D.sessions.get(n.id) || {}, par = ss.parent && D.sessions.get(ss.parent); s += trow(translate('sessionId'), ss.sid || '—') + trow(translate('parentSession'), par ? par.sid : translate('none')) + (n.kids ? trow(translate('subAgents') + ' (' + n.kids + ')', ks(n.kidIds)) + trow(translate('subAgentsInProgress'), n.kinf) : ''); }
   if (n.idle) s += trow(translate('idle'), Math.floor(n.idle / 60000) + translate('minutes'));
   if (n.type === 'x') s += trow(translate('credential'), exitSub(n.id) || '—') + (n.t429 ? trow(translate('recent429'), fmtClock(n.t429, true), 'bad') : '');
   if (n.type === 'r') s += trow(translate('rule'), ruleLabel(n.id));
-  return s + trow(translate('requests') + ' (' + rangeLabel() + ')', n.n) + trow(translate('inProgress'), n.inf) + trow(translate('successRate'), n.ok + n.fail >= 3 ? rate : '—') + trow(translate('tokens'), fmtK(n.tok)) + trow(translate('avgLatency'), n.ok >= 3 ? (n.lat / n.ok / 1000).toFixed(1) + 's' : '—');
+  return s + trow(translate('requests') + ' (' + rangeLabel() + ')', n.n) + trow(translate('inProgress'), n.inf) + trow(translate('successRate'), n.ok + n.fail >= 1 ? rate : '—') + trow(translate('tokens'), fmtK(n.tok)) + trow(translate('avgLatency'), n.ok >= 1 ? (n.lat / n.ok / 1000).toFixed(1) + 's' : '—');
 }
-const nodeTitle = n => !n ? '' : n.type === 'c' ? cliName(n.id) : n.type === 's' ? (n.fold ? '+' + n.fold.length + ' ' + translate('subAgents') : sessShort(n.id)) : n.type === 'r' ? ruleLabel(n.id) : exitName(n.id);
+const nodeTitle = n => !n ? '' : n.type === 'c' ? cliName(n.id) : n.type === 's' ? (n.fold ? '+' + n.fold.length + ' ' + (n.par ? translate('subAgents') : translate('sessions')) : sessShort(n.id)) : n.type === 'r' ? ruleLabel(n.id) : exitName(n.id);
 function placeTip(cx, cy) {
   const tw = tip.offsetWidth, th = tip.offsetHeight;
   let l = cx + 14; if (l + tw > innerWidth - 4) l = cx - tw - 14; l = clamp(l, 4, Math.max(4, innerWidth - tw - 4));
-  let t = cy + 14; if (t + th > innerHeight - 4) t = cy - th - 10;
-  tip.style.left = l + 'px'; tip.style.top = Math.max(4, t) + 'px';
+  let t = cy + 14; if (t + th > innerHeight - 8) t = cy - th - 10;
+  t = clamp(t, 8, Math.max(8, innerHeight - th - 8));
+  tip.style.left = l + 'px'; tip.style.top = t + 'px';
 }
 cvF.addEventListener('pointermove', e => {
   if (e.pointerType === 'touch') return;
   const r = cvF.getBoundingClientRect(), h = hitFlow(e.clientX - r.left, e.clientY - r.top), changed = (h && h.k) !== (hover && hover.k);
   hover = h; if (changed) { computeRel(); kick(); }
-  cvF.style.cursor = h && h.n && h.n.type === 'c' && h.n.sess.size ? 'pointer' : 'default';
+  cvF.style.cursor = (h && h.n && ((h.n.type === 'c' && h.n.sess.size) || (h.n.type === 's' && (h.n.toggleAll || h.n.collapseAll)))) ? 'pointer' : 'default';
   if (!h) { tip.classList.remove('on'); return; }
   tip.innerHTML = nodeTip(h); tip.classList.add('on'); placeTip(e.clientX, e.clientY);
 });
@@ -1457,7 +1524,17 @@ cvF.addEventListener('click', e => {
   const r = cvF.getBoundingClientRect(), h = hitFlow(e.clientX - r.left, e.clientY - r.top);
   if (h) { hover = h; computeRel(); tip.innerHTML = nodeTip(h); tip.classList.add('on'); placeTip(e.clientX, e.clientY); } else { hover = null; rel = null; tip.classList.remove('on'); }
   kick();
-  if (h && h.n && h.n.type === 'c' && (h.n.sess.size || expanded.has(h.n.id))) { const id = h.n.id; if (expanded.has(id)) { collapsed.add(id); opened.delete(id); expanded.delete(id); } else { opened.add(id); collapsed.delete(id); expanded.add(id); } computeVer = -1; F.sig = ''; kick(); }
+  if (h && h.n && h.n.type === 'c' && (h.n.sess.size || expanded.has(h.n.id))) {
+    const id = h.n.id;
+    if (expanded.has(id)) { collapsed.add(id); opened.delete(id); expanded.delete(id); expandedAll.delete(id); }
+    else { opened.add(id); collapsed.delete(id); expanded.add(id); }
+    computeVer = -1; F.sig = ''; kick();
+  } else if (h && h.n && h.n.type === 's' && (h.n.toggleAll || h.n.collapseAll)) {
+    const c = h.n.cli;
+    if (h.n.toggleAll) expandedAll.add(c);
+    else expandedAll.delete(c);
+    computeVer = -1; F.sig = ''; kick();
+  }
 });
 
 /* ---------- timeline ---------- */
