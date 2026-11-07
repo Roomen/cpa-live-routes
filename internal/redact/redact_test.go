@@ -70,6 +70,7 @@ func TestParseUA(t *testing.T) {
 		{"GeminiCLI/0.8.0/gemini-2.5-pro (darwin; arm64)", KindGeminiCLI, "Gemini CLI 0.8.0"},
 		{"antigravity/1.11.2 darwin/arm64", KindAntigravity, "Antigravity 1.11.2"},
 		{"agy/1.0", KindAntigravity, "Antigravity 1.0"},
+		{"ZCode/3.17.2", KindZCode, "ZCode 3.17.2"},
 		{"OpenAI/Python 1.40.0", KindSDK, "OpenAI/Python"},
 		{"Anthropic/JS 0.30.0", KindSDK, "Anthropic/JS"},
 		{"python-requests/2.31", KindSDK, "python-requests/2.31"},
@@ -91,6 +92,9 @@ func TestClientFromSessionAndIP(t *testing.T) {
 		t.Fatal(k)
 	}
 	if k, _ := ClientFromSession("agy:abc"); k != KindAntigravity {
+		t.Fatal(k)
+	}
+	if k, _ := ClientFromSession("zcode:abc"); k != KindZCode {
 		t.Fatal(k)
 	}
 	if k, _ := ClientFromSession("nothing"); k != "" {
