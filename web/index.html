@@ -177,7 +177,7 @@ h1{font-size:18px;margin:0;font-weight:650;letter-spacing:.01em}
     <span class="spacer"></span>
     <div class="ctl">
       <div class="seg" id="segLang" role="group" aria-label="Language">
-        <button data-lang="pt-br" aria-pressed="true">PT</button><button data-lang="en" aria-pressed="false">EN</button><button data-lang="zh-cn" aria-pressed="false">中文</button>
+        <button data-lang="pt-br" aria-pressed="true">PT</button><button data-lang="en" aria-pressed="false">EN</button><button data-lang="zh-cn" aria-pressed="false">中文</button><button data-lang="ru" aria-pressed="false" lang="ru">РУ</button>
       </div>
       <button class="btn" id="bPause" aria-pressed="false" data-i18n="pause">Pausar</button>
       <div class="seg" id="segSpeed" role="group" data-i18n-aria="animationSpeed">
@@ -254,7 +254,7 @@ h1{font-size:18px;margin:0;font-weight:650;letter-spacing:.01em}
 (() => {
 'use strict';
 // i18n system for cpa-live-routes
-// Languages: pt-br (default), en, zh-cn
+// Languages: pt-br (default), en, ru, zh-cn
 
 const I18N = {
   'pt-br': {
@@ -596,6 +596,169 @@ const I18N = {
     quiet: 'Quiet',
     win: 'Window',
     },
+  'ru': {
+    pageTitle: 'Маршруты в реальном времени',
+    liveRoutes: 'Маршруты в реальном времени',
+    connecting: 'Подключение',
+    connected: 'Подключено · в реальном времени',
+    connectedPaused: 'Подключено · пауза',
+    reconnecting: 'Повторное подключение',
+    demoMode: 'Демонстрационный режим',
+    demoModePaused: 'Демонстрационный режим · пауза',
+
+    pause: 'Пауза',
+    resume: 'Продолжить',
+    animationSpeed: 'Скорость анимации',
+    timeRange: 'Период',
+    layout: 'Компоновка',
+    tabs: 'Вкладки',
+    split: 'Две панели',
+    flowDirection: 'Направление потока',
+    flowRightToLeft: 'Справа налево (по умолчанию)',
+    flowLeftToRight: 'Слева направо (клиент слева)',
+    config: 'Настройки',
+    logout: 'Выйти',
+    backToNow: 'К текущему времени',
+
+    seconds30: '30 с',
+    minutes2: '2 мин',
+    minutes10: '10 мин',
+
+    intervalRequests: 'Запросы за период',
+    inProgress: 'В обработке',
+    successRate: 'Доля успешных',
+    outputToks: 'выход. токенов/с',
+    outputToksTooltip: 'Число выходных токенов, делённое на суммарное время генерации. Пересекающиеся интервалы от первого токена до завершения запроса учитываются один раз, время простоя исключается.',
+    avgLatency: 'Средняя задержка',
+
+    view: 'Вид',
+    flow: 'Поток',
+    timeline: 'Хронология',
+    modelLegend: 'Обозначения моделей',
+    rangeInfo: '',
+
+    flowCanvasRtlLabel: 'Запросы справа налево: сеанс (если развёрнут), клиент, модель CPA, учётные данные OAuth или API',
+    flowCanvasLtrLabel: 'Запросы слева направо: клиент, сеанс (если развёрнут), модель CPA, учётные данные OAuth или API',
+    timelineCanvasLabel: 'Хронология запросов по точкам входа',
+
+    recentRequests: 'Последние запросы',
+
+    activePluginConfig: 'Настройки отображения плагина',
+    configReadonly: 'Настройки отображения сразу вступают в силу и сохраняются в браузере. Файл CPA <code class="mono">config.yaml</code> при этом не меняется. Ограничения памяти на сервере задаёт шлюз.',
+    retentionMinutes: 'Хранение истории',
+    maxRecords: 'Макс. число записей',
+    activeWindowMinutes: 'Период активности потока',
+    defaultAnimationSpeed: 'Скорость анимации',
+    reducedAnimation: 'Упрощённая анимация',
+    inflightTracking: 'Отслеживать запросы в обработке',
+    defaultLayout: 'Компоновка',
+    layoutTabs: 'Вкладки',
+    layoutSplit: 'Две панели',
+    systemPrefersReducedMotion: 'В системе включено уменьшение движения',
+    serverMemoryHint: 'Срок хранения истории в памяти задаёт шлюз',
+    serverRecordsHint: 'Ёмкость кольцевого буфера в памяти задаёт шлюз',
+    speedDesc: 'Скорость движения точек на схеме',
+    layoutDesc: 'Компоновка панели по умолчанию',
+    gatewayDefault: 'Настройка шлюза',
+    localOverride: 'Настройка браузера',
+    enabled: 'Включено',
+    disabled: 'Выключено',
+    minutes: ' мин',
+    records: ' зап.',
+    copyYaml: 'Скопировать YAML',
+    yamlPartial: 'Это фрагмент конфигурации. Добавьте эти параметры в существующий блок и сохраните остальные, например api_key_labels и priority.',
+    copyYamlCopied: '✓ Скопировано',
+    resetConfig: 'Сбросить настройки',
+    resetDone: '✓ Настройки браузера сброшены',
+    configModified: '✓ Применены настройки браузера',
+    reducedAnimationDesc: 'Отключить движущиеся точки и показывать только толщину линий и счётчики',
+    inflightTrackingDesc: 'Отслеживание запросов в обработке настраивается в шлюзе',
+
+    accessDenied: 'Доступ запрещён',
+    accessDeniedMsg: 'Интерфейс управления CPA отклонил запрос. Настройте ключ управления в CPA (remote-management.secret-key или переменная окружения MANAGEMENT_PASSWORD). Ключ нужен и для локального доступа. Проверьте, разрешён ли удалённый доступ. Пять неудачных попыток входа подряд с одного IP блокируют доступ на 30 минут. Если IP заблокирован, дождитесь окончания блокировки.',
+    retryAuth: 'Ввести ключ заново',
+    needKey: 'Требуется ключ управления',
+    needKeyMsg: 'Каждый запрос данных проверяется по ключу управления CPA. По умолчанию ключ хранится в текущей вкладке и сохраняется при её обновлении. При закрытии вкладки ключ удаляется. Параметр «Запомнить ключ в этом браузере» сохраняет его в открытом виде. Используйте его только на личном устройстве. Недействительный ключ удаляется автоматически, как и при выходе.',
+    keyPlaceholder: 'Ключ управления',
+    verify: 'Проверить',
+    rememberKey: 'Запомнить ключ в этом браузере',
+    invalidKey: 'Ключ управления недействителен или истёк. Введите его заново.',
+
+    client: 'Клиент',
+    clientId: 'Клиент №',
+    unknownClient: 'Неизвестный клиент',
+    keyIp: 'Ключ / IP',
+    session: 'Сеанс',
+    sessionId: 'ID сеанса',
+    parentSession: 'Родительский сеанс',
+    none: 'Нет',
+    subAgents: 'Подагенты',
+    subAgentsInProgress: 'Активные подагенты',
+    exit: 'Выход',
+    exitId: 'Выход №',
+    unassigned: 'Не назначено',
+    credential: 'Учётные данные',
+    recent429: 'Недавние ошибки 429',
+    rule: 'Правило',
+    ruleId: 'Правило №',
+    unrecognized: 'Не распознано',
+    model: 'Модель',
+    models: 'мод.',
+    modelCountLabel: 'Число моделей',
+    recentRangeRequests: 'Запросы за последние {}',
+    entry: 'Вход',
+    foldedHint: 'Свёрнуто · наведите для просмотра',
+    idleDuration: 'Простой: {} мин',
+    status: 'Статус',
+    start: 'Начало',
+    ttft: 'Время до первого токена',
+    totalDuration: 'Общая длительность',
+    attempts: 'Попытки',
+    inputOutput: 'Ввод / вывод',
+    cache: 'Кэш',
+    reasoning: 'Рассуждение',
+    total: 'Всего',
+    requests: 'Запросы',
+    tokens: 'ток.',
+    rateWeight60s: 'Вес по частоте за 60 с',
+    failWeight: 'Вес по ошибкам',
+    collapsedSubagents: 'Свёрнутые подагенты',
+    clickExpandCollapse: 'Нажмите, чтобы развернуть или свернуть сеансы',
+    idle: 'Простой',
+    idleMinutes: ' мин простоя',
+    lastActivity: 'Последняя активность',
+    ago: 'назад',
+    followNow: 'Сейчас',
+    lookingBack: 'Просмотр истории',
+
+    queued: 'В очереди',
+    routed: 'Направлен',
+    done: 'Успешно',
+    failed: 'Ошибка',
+    canceled: 'Отменён',
+    rejected: 'Отклонён',
+    lost: 'Потерян',
+    other: 'Другое',
+
+    noRequestsInRange: 'За этот период запросов нет',
+    noDataLoaded: 'Более ранние данные не загружены',
+    noSessions: 'Нет сеансов за {} мин · Плагин видит только запросы, прошедшие через CPA после его загрузки',
+
+    clients: 'Клиенты',
+    sessions: 'Сеансы',
+    lineWidthHint: 'Толщина линии показывает частоту запросов за последние 60 секунд с экспоненциальным затуханием. Кольцо показывает долю трафика и ошибок за период. Нажмите на клиента, чтобы развернуть или свернуть сеансы.',
+    windowRequests: 'За период',
+
+    workMachine: 'Рабочая станция',
+    devMachine: 'Машина разработчика',
+    demo: 'Демо',
+    CPA: 'CPA',
+    error: 'Ошибка',
+    button: 'Кнопка',
+    kids: 'Дочерние',
+    quiet: 'Без активности',
+    win: 'Период',
+    },
     'zh-cn': {
     pageTitle: 'Live Routes',
     liveRoutes: '实时链路',
@@ -763,7 +926,7 @@ const I18N = {
 
 // Language detection and persistence
 const LANG_KEY = 'lr-lang';
-const SUPPORTED_LANGS = ['pt-br', 'en', 'zh-cn'];
+const SUPPORTED_LANGS = ['pt-br', 'en', 'zh-cn', 'ru'];
 
 function detectLang() {
   // 1. Saved preference
@@ -775,6 +938,7 @@ function detectLang() {
   if (nav.startsWith('pt')) return 'pt-br';
   if (nav.startsWith('zh')) return 'zh-cn';
   if (nav.startsWith('en')) return 'en';
+  if (nav === 'ru' || nav.startsWith('ru-')) return 'ru';
 
   // 3. Default to PT-BR
   return 'pt-br';
@@ -821,7 +985,7 @@ function applyI18n() {
   });
 
   // Update dynamic content that depends on language
-  document.documentElement.lang = currentLang === 'zh-cn' ? 'zh-CN' : currentLang === 'pt-br' ? 'pt-BR' : 'en';
+  document.documentElement.lang = currentLang === 'zh-cn' ? 'zh-CN' : currentLang === 'pt-br' ? 'pt-BR' : currentLang;
   document.querySelectorAll('#segLang button').forEach(button => {
     button.setAttribute('aria-pressed', button.dataset.lang === currentLang);
   });

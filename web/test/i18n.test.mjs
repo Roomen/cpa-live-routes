@@ -24,11 +24,12 @@ browser = await chromium.launch({ ...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE
 const strings = {
   'en': ['Live Routes', 'Demo mode', 'Resume', 'Retention', 'Management key'],
   'pt-br': ['Rotas ao Vivo', 'Modo demo', 'Continuar', 'Retenção', 'Chave de gerenciamento'],
+  'ru': ['Маршруты в реальном времени', 'Демонстрационный режим', 'Продолжить', 'Хранение истории', 'Ключ управления'],
   'zh-cn': ['实时链路', '演示模式', '继续', '保留时长', '管理密钥']
 };
 let count = 0;
   for (const initial of Object.keys(strings)) {
-    const context = await browser.newContext({ locale: initial, viewport: { width: 1280, height: 900 } });
+    const context = await browser.newContext({ locale: initial === 'ru' ? 'ru-RU' : initial, viewport: { width: 1280, height: 900 } });
     await context.addInitScript(() => {
       window.__canvasText = [];
       const fillText = CanvasRenderingContext2D.prototype.fillText;
@@ -55,23 +56,23 @@ let count = 0;
       assert.equal(await page.locator('#segLang button[aria-pressed="true"]').count(), 1);
       assert.ok((await page.locator('#cfgg').textContent()).includes(retention));
       assert.ok(Number(await page.locator('#cReq').textContent()) > 0);
-      const recentLabel = { en: 'Requests in the last', 'pt-br': 'Requisições nos últimos', 'zh-cn': '近' }[lang];
+      const recentLabel = { en: 'Requests in the last', 'pt-br': 'Requisições nos últimos', ru: 'Запросы за последние', 'zh-cn': '近' }[lang];
       assert.ok((await page.locator('#lReq').textContent()).startsWith(recentLabel), 'live request count describes the recent range');
       for (const direction of ['rtl', 'ltr']) for (const mode of ['flow', 'time', 'split']) {
         await page.click(`#segDirection button[data-d="${direction}"]`);
         await page.waitForFunction(direction => document.querySelector(`#segDirection button[data-d="${direction}"]`).getAttribute('aria-pressed') === 'true', direction);
-        const label = { en: direction === 'ltr' ? 'Left-to-right' : 'Right-to-left', 'pt-br': direction === 'ltr' ? 'esquerda para a direita' : 'direita para a esquerda', 'zh-cn': direction === 'ltr' ? '从左到右' : '从右到左' }[lang];
+        const label = { en: direction === 'ltr' ? 'Left-to-right' : 'Right-to-left', 'pt-br': direction === 'ltr' ? 'esquerda para a direita' : 'direita para a esquerda', ru: direction === 'ltr' ? 'слева направо' : 'справа налево', 'zh-cn': direction === 'ltr' ? '从左到右' : '从右到左' }[lang];
         assert.ok((await page.locator('#cvF').getAttribute('aria-label')).includes(label), `${lang}/${direction}: translated flow description`);
         await page.click(`#segLayout button[data-l="${mode === 'split' ? 'split' : 'tabs'}"]`);
         if (mode !== 'split') await page.click(`#segView button[data-v="${mode}"]`);
         await page.evaluate(() => { window.__canvasText = []; });
         await page.waitForTimeout(350);
         const canvasText = await page.evaluate(() => window.__canvasText);
-        const expected = mode === 'flow' ? { en: 'models', 'pt-br': 'modelos', 'zh-cn': '个模型' }[lang]
-          : { en: 'Follow · now', 'pt-br': 'Seguir · agora', 'zh-cn': '跟随现在' }[lang];
+        const expected = mode === 'flow' ? { en: 'models', 'pt-br': 'modelos', ru: 'мод.', 'zh-cn': '个模型' }[lang]
+          : { en: 'Follow · now', 'pt-br': 'Seguir · agora', ru: 'Сейчас', 'zh-cn': '跟随现在' }[lang];
         assert.ok(canvasText.some(text => text.includes(expected)), `${lang}/${mode}: translated canvas text`);
         if (mode !== 'time') {
-          const entry = { en: 'Entry', 'pt-br': 'Entrada', 'zh-cn': '入口' }[lang];
+          const entry = { en: 'Entry', 'pt-br': 'Entrada', ru: 'Вход', 'zh-cn': '入口' }[lang];
           // Headings are ellipsized to their column width; font metrics vary by platform.
           assert.ok(canvasText.some(text => text.startsWith(entry + ' ·')), `${lang}/${mode}/${direction}: translated credential column`);
         }
@@ -86,8 +87,9 @@ let count = 0;
       assert.notEqual(await page.locator('#pillT').textContent(), pill);
       await page.click('#bPause');
     }
+    await page.click('#segLang button[data-lang="ru"]');
     await page.reload();
-    assert.equal(await page.locator('h1').textContent(), strings['zh-cn'][0], 'saved language survives reload');
+    assert.equal(await page.locator('h1').textContent(), strings.ru[0], 'saved language survives reload');
     await page.goto(origin + '/v0/resource/plugins/live-routes/live');
     await page.waitForSelector('#gKeyBox:not([hidden])');
     for (const lang of Object.keys(strings)) {
